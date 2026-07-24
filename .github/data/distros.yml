@@ -464,6 +464,11 @@ legacy: # Info for platforms we used to support and still need to handle package
       <<: *ubuntu_packages
       repo_distro: ubuntu/plucky
   - <<: *ubuntu
+    version: "25.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/questing
+  - <<: *ubuntu
     version: "20.04"
     packages:
       <<: *ubuntu_packages
