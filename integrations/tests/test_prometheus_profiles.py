@@ -100,6 +100,18 @@ class BuildScopesTest(unittest.TestCase):
         self.assertEqual(self.scopes[0]['metrics'][0]['chart_type'], 'line')
 
 
+class TopLevelChartsTest(unittest.TestCase):
+    def test_charts_directly_on_template_form_a_leading_scope(self):
+        profile = sample_profile()
+        profile['template']['charts'] = [
+            {'title': 'Info', 'context': 'info', 'units': 'events', 'dimensions': [{'name': 'info'}]},
+        ]
+        scopes = gpp.build_scopes(profile, 'demo')
+        self.assertEqual([s['name'] for s in scopes], ['demo', 'process', 'frontends'])
+        # base_parts already carries the template context_namespace; it is not repeated.
+        self.assertEqual(scopes[0]['metrics'][0]['name'], 'prometheus.demo.info')
+
+
 class ContextCompositionTest(unittest.TestCase):
     def test_root_namespace_kept_when_different_from_app(self):
         profile = sample_profile()

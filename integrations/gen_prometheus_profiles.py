@@ -71,6 +71,17 @@ def _slug(text):
     return slug.strip('_')
 
 
+def _str_list(value):
+    """Return value as a list of strings, or None if it is not one.
+
+    Guards against a scalar (e.g. ``categories: some-category``) being silently
+    exploded into a list of characters by ``list()``.
+    """
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return list(value)
+    return None
+
+
 def iter_profile_files():
     """Yield profile YAML paths in deterministic (sorted) order."""
     if not PROFILES_DIR.is_dir():
@@ -193,16 +204,33 @@ def _scope_from_group(top_group, base_parts, display_name):
 
 
 def build_scopes(profile, profile_name):
-    """Emit the ``metrics.scopes`` list for a profile."""
+    """Emit the ``metrics.scopes`` list for a profile.
+
+    Each top-level ``template.groups`` entry becomes one scope. Charts declared
+    directly on the template (no enclosing group) form a single leading scope so
+    they are never silently dropped.
+    """
     template = profile.get('template') or {}
     app = _resolve_app(profile, profile_name)
     base_parts = _base_context_parts(app, template.get('context_namespace'))
     display_name = (profile.get('meta') or {}).get('name') or template.get('family') or app
 
-    return [
+    scopes = []
+    if template.get('charts'):
+        # The template's own context_namespace is already in base_parts, so this
+        # synthetic group carries only the charts (no namespace, no subgroups).
+        top_level = {
+            'family': template.get('family', ''),
+            'charts': template['charts'],
+            'chart_defaults': template.get('chart_defaults'),
+        }
+        scopes.append(_scope_from_group(top_level, base_parts, display_name))
+
+    scopes.extend(
         _scope_from_group(group, base_parts, display_name)
         for group in template.get('groups', []) or []
-    ]
+    )
+    return scopes
 
 
 def build_profile_module(base_module, profile, profile_name):
@@ -222,6 +250,17 @@ def build_profile_module(base_module, profile, profile_name):
         )
         return None
 
+    # categories/keywords must be YAML lists of strings; a scalar (e.g.
+    # `categories: some-category`) would otherwise be silently mangled by list().
+    categories = _str_list(meta_block.get('categories'))
+    keywords = _str_list(meta_block.get('keywords', []))
+    if categories is None or keywords is None:
+        debug(
+            f'prometheus profile {profile_name!r}: skipping integration page, '
+            f'meta.categories/meta.keywords must be lists of strings'
+        )
+        return None
+
     app = _resolve_app(profile, profile_name)
     display_name = meta_block['name']
 
@@ -233,9 +272,9 @@ def build_profile_module(base_module, profile, profile_name):
         'name': display_name,
         'link': meta_block['link'],
         'icon_filename': meta_block['icon_filename'],
-        'categories': list(meta_block['categories']),
+        'categories': categories,
     }
-    module['meta']['keywords'] = list(meta_block.get('keywords', []))
+    module['meta']['keywords'] = keywords
 
     description = meta_block.get('description') or f'Monitor {display_name}.'
     module['overview']['data_collection']['metrics_description'] = description

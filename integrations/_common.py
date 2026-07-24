@@ -170,7 +170,20 @@ def load_collectors(sources=None):
 
             if is_prometheus_metadata(path):
                 base_module = data['modules'][0]
+                existing_ids = {m['meta'].get('id') for m in data['modules']}
                 for offset, extra in enumerate(generate_profile_modules(base_module)):
+                    extra_id = extra['meta'].get('id')
+                    if extra_id in existing_ids:
+                        warn(f'Generated prometheus profile module id "{extra_id}" collides with an '
+                             f'existing module; skipping.', path)
+                        continue
+                    try:
+                        COLLECTOR_VALIDATOR.validate({'plugin_name': data['plugin_name'], 'modules': [extra]})
+                    except ValidationError as e:
+                        warn(f'Generated prometheus profile module "{extra_id}" failed schema validation: '
+                             f'{e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', path)
+                        continue
+                    existing_ids.add(extra_id)
                     extra['meta']['plugin_name'] = data['plugin_name']
                     extra['integration_type'] = 'collector'
                     extra['_src_path'] = path
