@@ -256,7 +256,8 @@ def build_profile_module(base_module, profile, profile_name):
     # but malformed field is an authoring error, so warn() it (fatal) rather than
     # letting the page vanish silently.
     categories = _str_list(meta_block.get('categories'))
-    keywords = _str_list(meta_block.get('keywords', []))
+    # An empty/null `keywords:` means "no keywords" (optional field), not an error.
+    keywords = _str_list(meta_block.get('keywords') or [])
     if categories is None or keywords is None:
         warn(
             f'prometheus profile {profile_name!r}: meta.categories/meta.keywords must be '

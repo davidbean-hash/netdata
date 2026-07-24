@@ -156,6 +156,14 @@ class BuildProfileModuleTest(unittest.TestCase):
         del profile['meta']['icon_filename']
         self.assertIsNone(gpp.build_profile_module(self.base_module(), profile, 'demo'))
 
+    def test_null_keywords_treated_as_empty(self):
+        # `keywords:` with no value (YAML null) means "no keywords", not an error.
+        profile = sample_profile()
+        profile['meta']['keywords'] = None
+        module = gpp.build_profile_module(self.base_module(), profile, 'demo')
+        self.assertIsNotNone(module)
+        self.assertEqual(module['meta']['keywords'], [])
+
     def test_scalar_categories_warns_and_skips(self):
         # A present-but-malformed field is an authoring error: warn (fatal) rather
         # than silently mangling the scalar into a list of characters.
