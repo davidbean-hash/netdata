@@ -41,12 +41,13 @@ static inline void common_system_ram(uint64_t free_bytes, uint64_t used_bytes, i
 #endif
 
 #ifdef OS_LINUX
-static inline void common_system_ram(uint64_t free_bytes, uint64_t used_bytes, uint64_t cached_bytes, uint64_t buffers_bytes, int update_every) {
+static inline void common_system_ram(uint64_t free_bytes, uint64_t used_bytes, uint64_t cached_bytes, uint64_t buffers_bytes, uint64_t hugepages_bytes, int update_every) {
     static RRDSET *st_system_ram = NULL;
     static RRDDIM *rd_free = NULL;
     static RRDDIM *rd_used = NULL;
     static RRDDIM *rd_cached = NULL;
     static RRDDIM *rd_buffers = NULL;
+    static RRDDIM *rd_hugepages = NULL;
 
     if(unlikely(!st_system_ram)) {
         st_system_ram = _system_ram_chart();
@@ -56,11 +57,19 @@ static inline void common_system_ram(uint64_t free_bytes, uint64_t used_bytes, u
         rd_buffers = rrddim_add(st_system_ram, "buffers", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
+    // hugepages memory is pre-allocated and managed as a separate pool; expose it
+    // as a distinct dimension (only on systems that actually reserve hugepages) so
+    // it is not accounted as genuinely used memory
+    if(hugepages_bytes && unlikely(!rd_hugepages))
+        rd_hugepages = rrddim_add(st_system_ram, "hugepages", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+
     // this always have to be in base units, so that exporting sends base units to other time-series db
     rrddim_set_by_pointer(st_system_ram, rd_free,    (collected_number)free_bytes);
     rrddim_set_by_pointer(st_system_ram, rd_used,    (collected_number)used_bytes);
     rrddim_set_by_pointer(st_system_ram, rd_cached, (collected_number)cached_bytes);
     rrddim_set_by_pointer(st_system_ram, rd_buffers, (collected_number)buffers_bytes);
+    if(rd_hugepages)
+        rrddim_set_by_pointer(st_system_ram, rd_hugepages, (collected_number)hugepages_bytes);
     rrdset_done(st_system_ram);
 }
 #endif
