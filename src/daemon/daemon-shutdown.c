@@ -87,8 +87,19 @@ void cancel_main_threads(void) {
 
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].thread && !nd_thread_is_me(static_threads[i].thread)) {
-            if (static_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
+            if (static_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED) {
                 nd_thread_join(static_threads[i].thread);
+
+                // nd_thread_join() frees the ND_THREAD wrapper. Clear the
+                // persistent static-thread slot so it no longer holds a
+                // dangling pointer: a later join on this slot (e.g. a
+                // re-entrant fatal/shutdown pass, or nd_thread_join_threads())
+                // then sees NULL and is a safe no-op instead of dereferencing
+                // and freez()-ing freed/recycled memory. This mirrors the
+                // convention already used by websocket_threads_join() and
+                // ml_stop_threads().
+                static_threads[i].thread = NULL;
+            }
         }
     }
     netdata_log_info("All threads finished.");
