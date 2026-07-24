@@ -121,6 +121,34 @@ modules:
               description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
               default_value: "null"
               required: false
+            - name: rollups.enabled
+              description: Master switch for the rule-based rollup layer that pins user-defined flow aggregations as standard Netdata charts (enabling alerting and per-dimension ML). No charts are emitted until rules are added.
+              default_value: "true"
+              required: false
+            - name: rollups.rules
+              description: List of rollup rules. Each rule becomes a chart `netflow.rollup_<name>` updated every second.
+              default_value: "[]"
+              required: false
+            - name: rollups.rules[].name
+              description: Unique rule id; used to build the chart id.
+              default_value: ""
+              required: true
+            - name: rollups.rules[].metric
+              description: Counter to aggregate, one of `bytes`, `packets`, or `flows`. Emitted cumulatively with the incremental algorithm so Netdata derives the per-second rate (bytes/s, packets/s, flows/s).
+              default_value: bytes
+              required: false
+            - name: rollups.rules[].group_by
+              description: Optional canonical flow field (for example `SRC_COUNTRY`). Produces one dimension per distinct value; omit to emit a single `all` dimension summing every matching flow. Empty values map to `unknown`.
+              default_value: ""
+              required: false
+            - name: rollups.rules[].filters
+              description: Optional allow-list keyed by canonical flow field. A flow matches when, for every listed field, its value is one of the listed values (AND across fields, OR within a field).
+              default_value: ""
+              required: false
+            - name: rollups.rules[].max_cardinality
+              description: Cap on distinct `group_by` values that get their own dimension; extra values fold into an `__overflow__` dimension.
+              default_value: 100
+              required: false
         examples:
           folding:
             title: Config
@@ -158,6 +186,31 @@ modules:
                     minute_1: { size_of_journal_files: 10GB, duration_of_journal_files: 14d }
                     minute_5: { size_of_journal_files: 10GB, duration_of_journal_files: 30d }
                     hour_1:   { size_of_journal_files: 10GB, duration_of_journal_files: 365d }
+            - name: Rollups as standard metrics for alerting and ML
+              folding:
+                enabled: true
+              description: |
+                Pin user-defined flow aggregations as standard Netdata charts so
+                alerting and per-dimension ML anomaly detection apply automatically.
+                Each rule becomes a `netflow.rollup_<name>` chart updated every second.
+              config: |
+                rollups:
+                  enabled: true
+                  rules:
+                    # bytes/s per source country, across all countries
+                    - name: bytes_by_src_country
+                      metric: bytes
+                      group_by: SRC_COUNTRY
+                    # bytes/s originating from a specific country
+                    - name: bytes_from_iran
+                      metric: bytes
+                      filters:
+                        SRC_COUNTRY: [IR]
+                    # packets/s per destination AS, capped at 200 dimensions
+                    - name: packets_by_dst_as
+                      metric: packets
+                      group_by: DST_AS
+                      max_cardinality: 200
     troubleshooting:
       problems:
         list:

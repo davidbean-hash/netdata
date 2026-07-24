@@ -1,5 +1,6 @@
 //! netflow-plugin standalone binary
 
+mod aggregation;
 mod api;
 mod charts;
 mod decoder;
@@ -174,6 +175,7 @@ async fn async_main() -> i32 {
     };
     let routing_runtime = ingest_service.routing_runtime();
     let network_sources_runtime = ingest_service.network_sources_runtime();
+    let rollup_engine = ingest_service.rollup_engine();
 
     let mut runtime = PluginRuntime::new("netflow-plugin");
     runtime.register_handler(NetflowFlowsHandler::new(
@@ -279,6 +281,34 @@ async fn async_main() -> i32 {
         }
     }
 
+    let mut rollup_task = None;
+    if let Some(engine) = rollup_engine {
+        let writer = runtime.writer();
+        let rollup_shutdown = shutdown.clone();
+        rollup_task = Some(tokio::spawn(async move {
+            let interval_duration = Duration::from_secs(1);
+            let mut interval = tokio::time::interval(interval_duration);
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let initial = engine.snapshot();
+            let mut emitter = aggregation::RollupEmitter::new(&initial, interval_duration);
+            loop {
+                tokio::select! {
+                    _ = rollup_shutdown.cancelled() => break,
+                    _ = interval.tick() => {
+                        let snapshot = engine.snapshot();
+                        let payload = emitter.render(&snapshot, std::time::SystemTime::now());
+                        if !payload.is_empty() {
+                            let mut guard = writer.lock().await;
+                            if let Err(err) = guard.write_raw(payload.as_bytes()).await {
+                                tracing::warn!("failed to emit netflow rollup metrics: {err:#}");
+                            }
+                        }
+                    }
+                }
+            }
+        }));
+    }
+
     let mut exit_code = 0;
     let keepalive_required = !std::io::stdout().is_terminal();
     let mut ingest_task = ingest_task;
@@ -372,6 +402,16 @@ async fn async_main() -> i32 {
             Ok(()) => {}
             Err(err) if !err.is_cancelled() => {
                 tracing::error!("network-sources task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+    if let Some(task) = rollup_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("rollup emitter task join error: {err}");
                 exit_code = 1;
             }
             Err(_) => {}

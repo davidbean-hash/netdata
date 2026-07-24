@@ -88,6 +88,52 @@ charts:
     enabled: false
     interval: 10s
 
+# Rule-based rollups: pin user-defined flow aggregations as standard Netdata
+# metrics. Every configured rule becomes a chart (netflow.rollup_<name>) that
+# is updated each second. Because the results are ordinary metrics, Netdata
+# alerting and per-dimension ML anomaly detection apply to them automatically.
+#
+# Each rule:
+#   name:            unique rule id; used to build the chart id.
+#   metric:          counter to aggregate: bytes | packets | flows. Emitted
+#                    cumulatively with the incremental algorithm, so Netdata
+#                    derives the per-second rate (bytes/s, packets/s, flows/s).
+#   group_by:        optional canonical flow field (e.g. SRC_COUNTRY). Produces
+#                    one dimension per distinct value. Omit to emit a single
+#                    "all" dimension summing every matching flow. Empty values
+#                    (e.g. an unresolved GeoIP country) map to "unknown".
+#   filters:         optional allow-list keyed by canonical flow field. A flow
+#                    matches when, for every listed field, its value is one of
+#                    the listed values (AND across fields, OR within a field).
+#   max_cardinality: cap on distinct group_by values that get their own
+#                    dimension; extra values fold into a "__overflow__"
+#                    dimension. Defaults to 100.
+#
+# The layer is enabled by default but emits nothing until rules are added.
+rollups:
+  enabled: true
+  rules: []
+  # Examples (uncomment and adapt):
+  #
+  # # bytes/s per source country, across all countries
+  # - name: bytes_by_src_country
+  #   metric: bytes
+  #   group_by: SRC_COUNTRY
+  #
+  # # bytes/s originating from a specific country
+  # - name: bytes_from_iran
+  #   metric: bytes
+  #   filters:
+  #     SRC_COUNTRY: [IR]
+  #
+  # # packets/s per destination AS for two exporters only
+  # - name: packets_by_dst_as
+  #   metric: packets
+  #   group_by: DST_AS
+  #   filters:
+  #     EXPORTER_IP: ["10.0.0.1", "10.0.0.2"]
+  #   max_cardinality: 200
+
 # Optional advanced enrichment modules.
 # Keep disabled unless explicitly configured.
 enrichment:

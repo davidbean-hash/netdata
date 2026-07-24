@@ -5,6 +5,7 @@ mod charts;
 mod enrichment;
 mod journal;
 mod listener;
+mod rollups;
 
 impl PluginConfig {
     pub(super) fn validate(&self) -> Result<()> {
@@ -12,6 +13,7 @@ impl PluginConfig {
         journal::validate_journal(self)?;
         enrichment::validate_enrichment(self)?;
         charts::validate_charts(self)?;
+        rollups::validate_rollups(self)?;
         Ok(())
     }
 }

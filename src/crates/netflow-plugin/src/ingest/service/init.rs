@@ -83,6 +83,9 @@ impl IngestService {
         }
         Self::cleanup_obsolete_decoder_state_namespaces(&decoder_state_dir);
 
+        let rollup_engine =
+            crate::aggregation::RollupEngine::from_config(&cfg.rollups).map(Arc::new);
+
         Ok(Self {
             cfg,
             metrics,
@@ -99,6 +102,7 @@ impl IngestService {
             open_tiers,
             tier_flow_indexes,
             facet_runtime,
+            rollup_engine,
             routing_runtime,
             network_sources_runtime,
             encode_buf: JournalEncodeBuffer::new(),
@@ -107,6 +111,10 @@ impl IngestService {
 
     pub(crate) fn routing_runtime(&self) -> Option<DynamicRoutingRuntime> {
         self.routing_runtime.clone()
+    }
+
+    pub(crate) fn rollup_engine(&self) -> Option<Arc<crate::aggregation::RollupEngine>> {
+        self.rollup_engine.clone()
     }
 
     pub(crate) fn network_sources_runtime(&self) -> Option<NetworkSourcesRuntime> {

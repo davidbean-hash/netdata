@@ -98,6 +98,13 @@ The plugin is configured via `netflow.yaml` in the Netdata configuration directo
 | journal.journal_dir | Directory for journal files (relative to NETDATA_CACHE_DIR). | flows | no |
 | journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention. | 10GB | no |
 | journal.tiers.&lt;tier&gt;.duration_of_journal_files | Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap. | null | no |
+| rollups.enabled | Master switch for the rule-based rollup layer that pins user-defined flow aggregations as standard Netdata charts (enabling alerting and per-dimension ML). No charts are emitted until rules are added. | true | no |
+| rollups.rules | List of rollup rules. Each rule becomes a chart `netflow.rollup_<name>` updated every second. | [] | no |
+| rollups.rules[].name | Unique rule id; used to build the chart id. |  | yes |
+| rollups.rules[].metric | Counter to aggregate, one of `bytes`, `packets`, or `flows`. Emitted cumulatively with the incremental algorithm so Netdata derives the per-second rate (bytes/s, packets/s, flows/s). | bytes | no |
+| rollups.rules[].group_by | Optional canonical flow field (for example `SRC_COUNTRY`). Produces one dimension per distinct value; omit to emit a single `all` dimension summing every matching flow. Empty values map to `unknown`. |  | no |
+| rollups.rules[].filters | Optional allow-list keyed by canonical flow field. A flow matches when, for every listed field, its value is one of the listed values (AND across fields, OR within a field). |  | no |
+| rollups.rules[].max_cardinality | Cap on distinct `group_by` values that get their own dimension; extra values fold into an `__overflow__` dimension. | 100 | no |
 
 
 </details>
@@ -155,6 +162,36 @@ journal:
     minute_1: { size_of_journal_files: 10GB, duration_of_journal_files: 14d }
     minute_5: { size_of_journal_files: 10GB, duration_of_journal_files: 30d }
     hour_1:   { size_of_journal_files: 10GB, duration_of_journal_files: 365d }
+
+```
+</details>
+
+###### Rollups as standard metrics for alerting and ML
+
+Pin user-defined flow aggregations as standard Netdata charts so
+alerting and per-dimension ML anomaly detection apply automatically.
+Each rule becomes a `netflow.rollup_<name>` chart updated every second.
+
+<details open><summary>Config</summary>
+
+```yaml
+rollups:
+  enabled: true
+  rules:
+    # bytes/s per source country, across all countries
+    - name: bytes_by_src_country
+      metric: bytes
+      group_by: SRC_COUNTRY
+    # bytes/s originating from a specific country
+    - name: bytes_from_iran
+      metric: bytes
+      filters:
+        SRC_COUNTRY: [IR]
+    # packets/s per destination AS, capped at 200 dimensions
+    - name: packets_by_dst_as
+      metric: packets
+      group_by: DST_AS
+      max_cardinality: 200
 
 ```
 </details>
