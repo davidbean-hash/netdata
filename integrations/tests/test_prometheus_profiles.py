@@ -156,6 +156,19 @@ class BuildProfileModuleTest(unittest.TestCase):
         del profile['meta']['icon_filename']
         self.assertIsNone(gpp.build_profile_module(self.base_module(), profile, 'demo'))
 
+    def test_scalar_categories_warns_and_skips(self):
+        # A present-but-malformed field is an authoring error: warn (fatal) rather
+        # than silently mangling the scalar into a list of characters.
+        from _common import WARNINGS
+        before = len(WARNINGS)
+        profile = sample_profile()
+        profile['meta']['categories'] = 'data-collection.web-servers-and-proxies'
+        try:
+            self.assertIsNone(gpp.build_profile_module(self.base_module(), profile, 'demo'))
+            self.assertEqual(len(WARNINGS), before + 1)
+        finally:
+            del WARNINGS[before:]
+
 
 class StockHaproxyProfileTest(unittest.TestCase):
     """The shipped haproxy profile must produce a valid, non-empty page."""

@@ -252,12 +252,16 @@ def build_profile_module(base_module, profile, profile_name):
 
     # categories/keywords must be YAML lists of strings; a scalar (e.g.
     # `categories: some-category`) would otherwise be silently mangled by list().
+    # Unlike a missing meta block (incremental adoption -> silent skip), a present
+    # but malformed field is an authoring error, so warn() it (fatal) rather than
+    # letting the page vanish silently.
     categories = _str_list(meta_block.get('categories'))
     keywords = _str_list(meta_block.get('keywords', []))
     if categories is None or keywords is None:
-        debug(
-            f'prometheus profile {profile_name!r}: skipping integration page, '
-            f'meta.categories/meta.keywords must be lists of strings'
+        warn(
+            f'prometheus profile {profile_name!r}: meta.categories/meta.keywords must be '
+            f'lists of strings; not generating an integration page',
+            PROFILES_DIR / f'{profile_name}.yaml'
         )
         return None
 
