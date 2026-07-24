@@ -11,6 +11,9 @@
 int respect_web_browser_do_not_track_policy = 0;
 const char *web_x_frame_options = NULL;
 
+const char *web_url_prefix = NULL;
+size_t web_url_prefix_len = 0;
+
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 
 void web_client_set_conn_tcp(struct web_client *w) {
@@ -1441,6 +1444,17 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                                                w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
             }
 
+            // Enforce the configured [web].url base path: a request that did
+            // not carry the prefix is answered with 404 (the flag is only set
+            // for direct web-server TCP requests when a prefix is configured).
+            if(unlikely(web_client_flag_check(w, WEB_CLIENT_FLAG_URL_PREFIX_MISMATCH))) {
+                buffer_flush(w->response.data);
+                w->response.data->content_type = CT_TEXT_HTML;
+                buffer_strcat(w->response.data, "File does not exist, or is not accessible.");
+                w->response.code = HTTP_RESP_NOT_FOUND;
+                break;
+            }
+
             // Check if this is a WebSocket upgrade request
             // The full WebSocket handshake detection will happen in the header parsing,
             // but we need to set the initial mode to GET for processing to continue
@@ -2019,8 +2033,10 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
 
     // PATH_IS_MCP is a function of the URL alone; clear and re-derive on
     // every decode so keepalived connections reusing the same web_client
-    // for a different URL see a fresh value.
+    // for a different URL see a fresh value. The URL base path match is
+    // likewise re-derived per request.
     web_client_flag_clear(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_URL_PREFIX_MISMATCH);
 
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
@@ -2038,6 +2054,27 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
         url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+
+        // If a URL base path is configured, direct web-server (TCP) requests
+        // must carry it: strip the prefix before routing, or flag a mismatch
+        // so the request is answered with 404. This is a lightweight obscurity
+        // control, not authentication. WebRTC/Cloud transports do not carry
+        // this local prefix and are therefore exempt.
+        if(web_url_prefix && web_client_check_conn_tcp(w)) {
+            size_t path_len = strcspn(buffer, "?");
+            if(path_len >= web_url_prefix_len &&
+               memcmp(buffer, web_url_prefix, web_url_prefix_len) == 0 &&
+               (path_len == web_url_prefix_len || buffer[web_url_prefix_len] == '/')) {
+                char *rest = &buffer[web_url_prefix_len];
+                if(*rest != '/')
+                    // exact match with no sub-path (e.g. "/prefix" or
+                    // "/prefix?x"): synthesize the root path "/"
+                    *(--rest) = '/';
+                memmove(buffer, rest, strlen(rest) + 1);
+            }
+            else
+                web_client_flag_set(w, WEB_CLIENT_FLAG_URL_PREFIX_MISMATCH);
+        }
 
         char *question_mark_start = strchr(buffer, '?');
         if (question_mark_start) {

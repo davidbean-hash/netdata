@@ -15,6 +15,11 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 extern int respect_web_browser_do_not_track_policy;
 extern const char *web_x_frame_options;
 
+// [web].url base path — when set, direct web-server requests must be prefixed
+// with this path; it is stripped before routing. Empty (NULL) means root.
+extern const char *web_url_prefix;
+extern size_t web_url_prefix_len;
+
 typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
@@ -72,6 +77,7 @@ typedef enum __attribute__((packed)) {
     WEB_CLIENT_FLAG_MCP_PREVIEW_KEY         = (1 << 28), // Authorization header matched MCP preview key
     WEB_CLIENT_FLAG_PATH_IS_MCP             = (1 << 29), // URL path is /mcp[/...] or /sse[/...] — set during URL decoding so it's also available for OPTIONS preflights (which skip the URL dispatcher)
     WEB_CLIENT_FLAG_SSL_CHECKED             = (1 << 30), // the initial TCP bytes have been classified as TLS or plain HTTP
+    WEB_CLIENT_FLAG_URL_PREFIX_MISMATCH     = (1U << 31), // request path did not carry the configured [web] url base path — set during URL decoding, answered with 404
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)

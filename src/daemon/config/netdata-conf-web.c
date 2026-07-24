@@ -55,6 +55,31 @@ void web_server_threading_selection(void) {
     }
 }
 
+// Read and normalize the [web].url base path option.
+// Returns NULL when unset (root), otherwise a newly-allocated string of the
+// form "/<path>" with surrounding whitespace and slashes trimmed.
+static const char *netdata_conf_web_url_prefix(void) {
+    const char *raw = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "url base path", "");
+
+    // trim leading whitespace and slashes
+    while(*raw && (isspace((uint8_t)*raw) || *raw == '/'))
+        raw++;
+
+    // trim trailing whitespace and slashes
+    size_t len = strlen(raw);
+    while(len > 0 && (isspace((uint8_t)raw[len - 1]) || raw[len - 1] == '/'))
+        len--;
+
+    if(len == 0)
+        return NULL;
+
+    char *prefix = mallocz(len + 2);
+    prefix[0] = '/';
+    memcpy(&prefix[1], raw, len);
+    prefix[len + 1] = '\0';
+    return prefix;
+}
+
 void netdata_conf_section_web(void) {
     FUNCTION_RUN_ONCE();
 
@@ -72,6 +97,9 @@ void netdata_conf_section_web(void) {
     web_x_frame_options = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "x-frame-options response header", "");
     if(!*web_x_frame_options)
         web_x_frame_options = NULL;
+
+    web_url_prefix = netdata_conf_web_url_prefix();
+    web_url_prefix_len = web_url_prefix ? strlen(web_url_prefix) : 0;
 
     web_allow_connections_from =
         simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
