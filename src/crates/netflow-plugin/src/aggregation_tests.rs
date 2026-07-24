@@ -257,6 +257,43 @@ fn sanitize_id_replaces_unsafe_characters() {
 }
 
 #[test]
+fn escape_protocol_text_neutralizes_quotes_and_control_chars() {
+    assert_eq!(escape_protocol_text("Acme Corp"), "Acme Corp");
+    assert_eq!(escape_protocol_text("O'Brien"), "O Brien");
+    assert_eq!(escape_protocol_text("bad\nline"), "bad line");
+    assert_eq!(escape_protocol_text("  spaced  "), "spaced");
+    assert_eq!(escape_protocol_text("'\n\t"), "unknown");
+}
+
+#[test]
+fn emitter_escapes_untrusted_dimension_labels() {
+    let cfg = config(vec![rule(
+        "as_names",
+        Some("SRC_AS_NAME"),
+        &[],
+        RollupMetric::Bytes,
+        100,
+    )]);
+    let engine = RollupEngine::from_config(&cfg).unwrap();
+    let now = UNIX_EPOCH + Duration::from_secs(100);
+
+    let mut malicious = record("", 100, 1);
+    malicious.src_as_name = "A'B\nC".to_string();
+    engine.observe(&malicious);
+
+    let snapshot = engine.snapshot();
+    let mut emitter = RollupEmitter::new(&snapshot, Duration::from_secs(1));
+    let out = emitter.render(&snapshot, now);
+
+    // The quote and newline from the untrusted label must not survive into the
+    // stream, and the emitted line stays well-formed with a sanitized id.
+    assert!(!out.contains("A'B"));
+    assert!(!out.contains("B\nC"));
+    assert!(out.contains("DIMENSION A_B_C 'A B C' incremental 1 1\n"));
+    assert!(out.contains("SET A_B_C = 100\n"));
+}
+
+#[test]
 fn metric_units_match_rate_semantics() {
     assert_eq!(RollupMetric::Bytes.units(), "bytes/s");
     assert_eq!(RollupMetric::Packets.units(), "packets/s");

@@ -156,35 +156,47 @@ struct FieldCaptureSink<'a> {
 }
 
 impl<'a> FieldCaptureSink<'a> {
-    fn capture(&mut self, field: &'static str, value: String) {
-        if self.wanted.contains(field) {
-            self.out.insert(field, value);
-        }
+    fn wants(&self, field: &'static str) -> bool {
+        self.wanted.contains(field)
     }
 }
 
 impl FacetValueSink for FieldCaptureSink<'_> {
     fn insert_text_static(&mut self, field: &'static str, value: &str) {
-        self.capture(field, value.to_string());
+        if self.wants(field) {
+            self.out.insert(field, value.to_string());
+        }
     }
     fn insert_u8_static(&mut self, field: &'static str, value: u8) {
-        self.capture(field, value.to_string());
+        if self.wants(field) {
+            self.out.insert(field, value.to_string());
+        }
     }
     fn insert_u8_present_static(&mut self, field: &'static str, value: u8) {
-        self.capture(field, value.to_string());
+        if self.wants(field) {
+            self.out.insert(field, value.to_string());
+        }
     }
     fn insert_u16_static(&mut self, field: &'static str, value: u16) {
-        self.capture(field, value.to_string());
+        if self.wants(field) {
+            self.out.insert(field, value.to_string());
+        }
     }
     fn insert_u32_static(&mut self, field: &'static str, value: u32) {
-        self.capture(field, value.to_string());
+        if self.wants(field) {
+            self.out.insert(field, value.to_string());
+        }
     }
     fn insert_u64_static(&mut self, field: &'static str, value: u64) {
-        self.capture(field, value.to_string());
+        if self.wants(field) {
+            self.out.insert(field, value.to_string());
+        }
     }
     fn insert_ip_static(&mut self, field: &'static str, value: Option<IpAddr>) {
-        if let Some(addr) = value {
-            self.capture(field, addr.to_string());
+        if let Some(addr) = value
+            && self.wants(field)
+        {
+            self.out.insert(field, addr.to_string());
         }
     }
 }
@@ -272,6 +284,7 @@ impl RollupEngine {
 /// only when a new dimension appears.
 pub(crate) struct RollupEmitter {
     interval: Duration,
+    last_emit: Option<SystemTime>,
     charts: Vec<ChartEmitState>,
 }
 
@@ -291,20 +304,32 @@ impl RollupEmitter {
             .map(|snapshot| ChartEmitState {
                 chart_id: format!("netflow.rollup_{}", sanitize_id(&snapshot.name)),
                 context: format!("netdata.netflow.rollup_{}", sanitize_id(&snapshot.name)),
-                title: format!("Netflow Rollup {}", snapshot.name),
+                title: format!("Netflow Rollup {}", escape_protocol_text(&snapshot.name)),
                 units: snapshot.metric.units(),
                 chart_type: if snapshot.grouped { "stacked" } else { "line" },
                 defined_dims: BTreeSet::new(),
             })
             .collect();
-        Self { interval, charts }
+        Self {
+            interval,
+            last_emit: None,
+            charts,
+        }
     }
 
     /// Render one collection cycle for all rules to Netdata protocol bytes.
     pub(crate) fn render(&mut self, snapshots: &[RuleSnapshot], now: SystemTime) -> String {
+        // Report the actual time elapsed since the previous emission so Netdata
+        // computes rates over the real interval even when a tick is skipped.
+        let dt = match self.last_emit {
+            Some(prev) => now.duration_since(prev).unwrap_or(self.interval),
+            None => self.interval,
+        };
+        self.last_emit = Some(now);
+
         let mut out = String::new();
         for (chart, snapshot) in self.charts.iter_mut().zip(snapshots.iter()) {
-            chart.render_into(&mut out, snapshot, self.interval, now);
+            chart.render_into(&mut out, snapshot, self.interval, dt, now);
         }
         out
     }
@@ -315,7 +340,8 @@ impl ChartEmitState {
         &mut self,
         out: &mut String,
         snapshot: &RuleSnapshot,
-        interval: Duration,
+        update_every: Duration,
+        dt: Duration,
         now: SystemTime,
     ) {
         let dim_ids: Vec<(String, u64)> = snapshot
@@ -339,10 +365,14 @@ impl ChartEmitState {
                 self.context,
                 self.chart_type,
                 ROLLUP_CHART_PRIORITY,
-                interval.as_secs().max(1),
+                update_every.as_secs().max(1),
             ));
             for (label, (id, _)) in snapshot.dimensions.iter().zip(dim_ids.iter()) {
-                out.push_str(&format!("DIMENSION {} '{}' incremental 1 1\n", id, label.0));
+                out.push_str(&format!(
+                    "DIMENSION {} '{}' incremental 1 1\n",
+                    id,
+                    escape_protocol_text(&label.0)
+                ));
                 self.defined_dims.insert(id.clone());
             }
         }
@@ -354,7 +384,7 @@ impl ChartEmitState {
         out.push_str(&format!(
             "BEGIN {} {}\n",
             self.chart_id,
-            interval.as_micros().max(1),
+            dt.as_micros().max(1),
         ));
         for (id, value) in &dim_ids {
             out.push_str(&format!("SET {} = {}\n", id, clamp_to_i64(*value)));
@@ -372,8 +402,26 @@ fn clamp_to_i64(value: u64) -> i64 {
     value.min(i64::MAX as u64) as i64
 }
 
+/// Neutralize a human-readable string for embedding inside a single-quoted
+/// Netdata protocol argument (chart title, dimension display name). Group
+/// labels and titles derive from untrusted flow enrichment (exporter/BGP/GeoIP
+/// strings) which may contain the `'` delimiter or newlines that would
+/// otherwise terminate or inject into the plugin protocol stream.
+fn escape_protocol_text(raw: &str) -> String {
+    let cleaned: String = raw
+        .chars()
+        .map(|c| if c.is_control() || c == '\'' { ' ' } else { c })
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        UNKNOWN_GROUP_LABEL.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 /// Reduce an arbitrary label to a Netdata-safe chart/dimension identifier.
-fn sanitize_id(raw: &str) -> String {
+pub(crate) fn sanitize_id(raw: &str) -> String {
     let mut out: String = raw
         .chars()
         .map(|c| {

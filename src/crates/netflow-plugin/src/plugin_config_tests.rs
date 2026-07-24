@@ -666,6 +666,25 @@ rules:
 }
 
 #[test]
+fn rollups_config_rejects_colliding_sanitized_chart_ids() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: bytes/country
+    metric: bytes
+  - name: bytes_country
+    metric: packets
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("colliding sanitized chart ids must be rejected");
+    assert!(err.to_string().contains("collides with another rule"));
+}
+
+#[test]
 fn rollups_config_rejects_unknown_fields() {
     let result: Result<RollupsConfig, _> = serde_yaml::from_str(
         r#"
