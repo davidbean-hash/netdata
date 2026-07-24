@@ -37,6 +37,22 @@ static bool wmi_get_string_property(IWbemClassObject *pclsObj, const wchar_t *pr
     return true;
 }
 
+static bool wmi_get_uint_property(IWbemClassObject *pclsObj, const wchar_t *prop, uint32_t *out) {
+    if(!pclsObj || !out) return false;
+
+    VARIANT vtProp;
+    VariantInit(&vtProp);
+    HRESULT hr = pclsObj->lpVtbl->Get(pclsObj, prop, 0, &vtProp, 0, 0);
+    if(FAILED(hr) || (vtProp.vt != VT_I4 && vtProp.vt != VT_UI4)) {
+        VariantClear(&vtProp);
+        return false;
+    }
+
+    *out = (uint32_t)vtProp.uintVal;
+    VariantClear(&vtProp);
+    return true;
+}
+
 static IWbemClassObject *wmi_exec_single_row_query(const wchar_t *query_text, const char *caller) {
     HRESULT init_hr = InitializeWMI();
     if(FAILED(init_hr) || !nd_wmi.pSvc)
@@ -105,6 +121,24 @@ bool GetWin32ComputerSystemInfo(Win32ComputerSystemInfo *out) {
 
     wmi_get_string_property(pclsObj, L"Model", out->Model, sizeof(out->Model));
     wmi_get_string_property(pclsObj, L"Manufacturer", out->Manufacturer, sizeof(out->Manufacturer));
+    out->Populated = true;
+    pclsObj->lpVtbl->Release(pclsObj);
+    return true;
+}
+
+bool GetWin32OperatingSystemInfo(Win32OperatingSystemInfo *out) {
+    if(!out) return false;
+    memset(out, 0, sizeof(*out));
+
+    IWbemClassObject *pclsObj = wmi_exec_single_row_query(
+        L"SELECT Caption, ProductType, Version FROM Win32_OperatingSystem",
+        "GetWin32OperatingSystemInfo()");
+    if(!pclsObj)
+        return false;
+
+    wmi_get_string_property(pclsObj, L"Caption", out->Caption, sizeof(out->Caption));
+    wmi_get_string_property(pclsObj, L"Version", out->Version, sizeof(out->Version));
+    out->ProductTypeValid = wmi_get_uint_property(pclsObj, L"ProductType", &out->ProductType);
     out->Populated = true;
     pclsObj->lpVtbl->Release(pclsObj);
     return true;

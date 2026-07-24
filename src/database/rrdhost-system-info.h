@@ -19,6 +19,10 @@ struct rrdhost_system_info {
     char *host_os_version;
     char *host_os_version_id;
     char *host_os_detection;
+    // Windows-only: Win32_OperatingSystem Caption (edition name) and ProductType.
+    char *host_os_caption;
+    char *host_os_product_type;    // decoded: Workstation / DomainController / Server
+    char *host_os_product_type_id; // raw ProductType number (1/2/3)
     char *host_cores;
     char *host_cpu_freq;
     char *host_cpu_model;
