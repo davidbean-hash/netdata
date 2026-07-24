@@ -1,0 +1,49 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SMBIOS memory (DMI type 17) collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds. Memory inventory is static, so a long interval is recommended.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "path": {
+        "title": "DMI table path",
+        "description": "Path to the raw SMBIOS structure table. Reading it usually requires elevated permissions.",
+        "type": "string",
+        "default": "/sys/firmware/dmi/tables/DMI"
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "path": {
+      "ui:placeholder": "/sys/firmware/dmi/tables/DMI"
+    }
+  }
+}

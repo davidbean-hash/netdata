@@ -1,0 +1,12 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: smbios_memory
+placements:
+  - id: smbios_memory
+    section_id: system.hardware
+    title: SMBIOS Memory (DIMM inventory)
+    icon: hardware
+    items:
+      - smbios_memory.dimm_size
+      - smbios_memory.dimm_speed
+      - smbios_memory.dimm_ranks
