@@ -145,25 +145,43 @@ func TestMemoryDeviceSize(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		sizeWord    uint16
-		extSize     uint32
-		wantBytes   uint64
-		wantPresent bool
+		sizeWord  uint16
+		extSize   uint32
+		wantBytes uint64
 	}{
-		"no module installed": {sizeWord: 0x0000, wantPresent: false},
-		"unknown size":        {sizeWord: 0xFFFF, wantPresent: false},
-		"megabytes":           {sizeWord: 16384, wantBytes: 16 * gib, wantPresent: true},
-		"kilobytes":           {sizeWord: 0x8000 | 512, wantBytes: 512 * 1024, wantPresent: true},
-		"extended size":       {sizeWord: 0x7FFF, extSize: 65536, wantBytes: 64 * gib, wantPresent: true},
+		"no module installed": {sizeWord: 0x0000, wantBytes: 0},
+		"unknown size":        {sizeWord: 0xFFFF, wantBytes: 0},
+		"megabytes":           {sizeWord: 16384, wantBytes: 16 * gib},
+		"kilobytes":           {sizeWord: 0x8000 | 512, wantBytes: 512 * 1024},
+		"extended size":       {sizeWord: 0x7FFF, extSize: 65536, wantBytes: 64 * gib},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			s := build(test.sizeWord, test.extSize)
-			gotBytes, gotPresent := memoryDeviceSize(test.sizeWord, s)
-			assert.Equal(t, test.wantBytes, gotBytes)
-			assert.Equal(t, test.wantPresent, gotPresent)
+			assert.Equal(t, test.wantBytes, memoryDeviceSize(test.sizeWord, s))
 		})
 	}
+}
+
+func TestParseMemoryDevicePresence(t *testing.T) {
+	build := func(sizeWord uint16) smbiosStructure {
+		f := make([]byte, 0x24-smbiosHeaderLen)
+		binary.LittleEndian.PutUint16(f[off17Size-smbiosHeaderLen:], sizeWord)
+		raw := buildStructure(smbiosTypeMemoryDevice, 1, f, nil)
+		got, err := parseSMBIOSStructures(raw)
+		require.NoError(t, err)
+		return got[0]
+	}
+
+	// Only size 0x0000 means the slot is empty.
+	empty := parseMemoryDevice(build(0x0000))
+	assert.False(t, empty.present)
+	assert.Equal(t, uint64(0), empty.sizeBytes)
+
+	// 0xFFFF means an installed module of unknown size: still present, size 0.
+	unknown := parseMemoryDevice(build(0xFFFF))
+	assert.True(t, unknown.present)
+	assert.Equal(t, uint64(0), unknown.sizeBytes)
 }
 
 func TestMemoryTypeAndFormFactorDecoding(t *testing.T) {

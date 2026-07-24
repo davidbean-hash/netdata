@@ -28,7 +28,9 @@ func (c *Collector) collect() error {
 			d.partNumber,
 		}
 
-		c.mx.dimmSize.WithLabelValues(labels...).Observe(float64(d.sizeBytes))
+		if d.sizeBytes > 0 {
+			c.mx.dimmSize.WithLabelValues(labels...).Observe(float64(d.sizeBytes))
+		}
 		if d.speedMTs > 0 {
 			c.mx.dimmSpeed.WithLabelValues(labels...).Observe(float64(d.speedMTs))
 		}

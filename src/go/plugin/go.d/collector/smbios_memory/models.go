@@ -6,8 +6,8 @@ package smbios_memory
 // (type 17) structure.
 type memoryDevice struct {
 	handle       uint16
-	present      bool // a module is installed in this slot
-	sizeBytes    uint64
+	present      bool   // a module is installed in this slot
+	sizeBytes    uint64 // 0 == unknown (an installed module may report an unknown size)
 	locator      string
 	bankLocator  string
 	memoryType   string // decoded, e.g. "DDR4", "DDR5"
@@ -37,7 +37,10 @@ func parseMemoryDevice(s smbiosStructure) memoryDevice {
 		d.memoryType = memoryType(v)
 	}
 	if raw, ok := s.u16(off17Size); ok {
-		d.sizeBytes, d.present = memoryDeviceSize(raw, s)
+		// Size 0x0000 is the only "no module installed" indicator; 0xFFFF means
+		// installed with an unknown size, so it must still be reported.
+		d.present = raw != 0x0000
+		d.sizeBytes = memoryDeviceSize(raw, s)
 	}
 	d.speedMTs = memoryDeviceSpeed(s)
 	if attr, ok := s.u8(off17Attributes); ok {
@@ -47,41 +50,42 @@ func parseMemoryDevice(s smbiosStructure) memoryDevice {
 	return d
 }
 
-// memoryDeviceSize decodes the Size field (offset 0x0C) into bytes. It reports
-// whether a module is actually installed.
+// memoryDeviceSize decodes the Size field (offset 0x0C) into bytes. It returns 0
+// when the size is unknown or no module is installed; use the Size word directly
+// (0x0000) to distinguish an empty slot from an installed module of unknown size.
 //
 // Encoding (SMBIOS spec 7.18.5):
 //   - 0x0000: no memory device installed in this slot
 //   - 0xFFFF: size unknown
 //   - 0x7FFF: size is in the Extended Size field (offset 0x1C), in MB
 //   - otherwise: bit 15 selects the unit (0 => MB, 1 => KB), bits 14:0 the value
-func memoryDeviceSize(raw uint16, s smbiosStructure) (uint64, bool) {
+func memoryDeviceSize(raw uint16, s smbiosStructure) uint64 {
 	switch raw {
 	case 0x0000, 0xFFFF:
-		return 0, false
+		return 0
 	case 0x7FFF:
 		ext, ok := s.u32(off17ExtendedSize)
 		if !ok {
-			return 0, false
+			return 0
 		}
-		mb := uint64(ext & 0x7FFFFFFF)
-		return mb * 1024 * 1024, mb > 0
+		return uint64(ext&0x7FFFFFFF) * 1024 * 1024
 	default:
 		if raw&0x8000 != 0 {
-			return uint64(raw&0x7FFF) * 1024, true
+			return uint64(raw&0x7FFF) * 1024
 		}
-		return uint64(raw) * 1024 * 1024, true
+		return uint64(raw) * 1024 * 1024
 	}
 }
 
 // memoryDeviceSpeed returns the module speed in MT/s. The configured (running)
 // speed is preferred when available; otherwise the maximum rated speed is used.
-// 0 means unknown.
+// 0 means unknown. For the speed fields only 0x0000 (unknown) and 0xFFFF
+// (reserved) are special values.
 func memoryDeviceSpeed(s smbiosStructure) uint64 {
-	if v, ok := s.u16(off17ConfiguredSpeed); ok && v != 0 && v != 0xFFFF && v != 0x7FFF {
+	if v, ok := s.u16(off17ConfiguredSpeed); ok && v != 0 && v != 0xFFFF {
 		return uint64(v)
 	}
-	if v, ok := s.u16(off17Speed); ok && v != 0 && v != 0xFFFF && v != 0x7FFF {
+	if v, ok := s.u16(off17Speed); ok && v != 0 && v != 0xFFFF {
 		return uint64(v)
 	}
 	return 0
