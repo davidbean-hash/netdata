@@ -501,6 +501,46 @@ static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_INSTALL_TYPE", "netdata-installer.exe");
 }
 
+// Win32_OperatingSystem.ProductType decoding:
+//   1 = Workstation (desktop), 2 = Domain Controller, 3 = Server.
+// https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-operatingsystem
+static const char *netdata_windows_product_type_name(uint32_t product_type)
+{
+    switch (product_type) {
+        case 1:
+            return "Workstation";
+        case 2:
+            return "DomainController";
+        case 3:
+            return "Server";
+        default:
+            return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+    }
+}
+
+// Capture the Windows edition Caption (e.g. "Microsoft Windows Server 2022 Standard") and the
+// ProductType (desktop-vs-server/domain-controller) from the Win32_OperatingSystem WMI class, so
+// nodes can be filtered/grouped by major Windows release and role. The kernel version alone does
+// not distinguish major releases or the desktop/server split.
+static void netdata_windows_get_os_details(struct rrdhost_system_info *systemInfo)
+{
+    Win32OperatingSystemInfo os;
+    if (!GetWin32OperatingSystemInfo(&os) || !os.Populated)
+        return;
+
+    if (os.Caption[0])
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_CAPTION", os.Caption);
+
+    if (os.ProductTypeValid) {
+        (void)rrdhost_system_info_set_by_name(
+            systemInfo, "NETDATA_HOST_OS_PRODUCT_TYPE", netdata_windows_product_type_name(os.ProductType));
+
+        char product_type_id[16];
+        (void)snprintf(product_type_id, sizeof(product_type_id), "%u", os.ProductType);
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_PRODUCT_TYPE_ID", product_type_id);
+    }
+}
+
 static bool netdata_windows_str_contains_ci(const char *haystack, const char *needle) {
     return haystack && needle && *needle && strcasestr(haystack, needle) != NULL;
 }
@@ -694,6 +734,7 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
     netdata_windows_detect_virtualization(systemInfo);
     container = netdata_windows_detect_container_state(systemInfo);
     netdata_windows_container(systemInfo, container);
+    netdata_windows_get_os_details(systemInfo);
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
     netdata_windows_install_type(systemInfo);

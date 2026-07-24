@@ -96,6 +96,18 @@ int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, con
         freez(system_info->host_os_detection);
         system_info->host_os_detection = strdupz(value);
     }
+    else if(!strcmp(name, "NETDATA_HOST_OS_CAPTION")){
+        freez(system_info->host_os_caption);
+        system_info->host_os_caption = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_PRODUCT_TYPE")){
+        freez(system_info->host_os_product_type);
+        system_info->host_os_product_type = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_PRODUCT_TYPE_ID")){
+        freez(system_info->host_os_product_type_id);
+        system_info->host_os_product_type_id = strdupz(value);
+    }
     else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
         freez(system_info->kernel_name);
         system_info->kernel_name = strdupz(value);
@@ -186,6 +198,9 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_region, "_cloud_instance_region");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_caption, "_os_caption");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_product_type, "_os_product_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_product_type_id, "_os_product_type_id");
     rrdlabels_get_value_strdup_or_null(labels, &info->kernel_version, "_kernel_version");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_cores, "_system_cores");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_freq, "_system_cpu_freq");
@@ -226,6 +241,15 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 
     if (system_info->host_os_version)
         rrdlabels_add(labels, "_os_version", system_info->host_os_version, RRDLABEL_SRC_AUTO);
+
+    if (system_info->host_os_caption)
+        rrdlabels_add(labels, "_os_caption", system_info->host_os_caption, RRDLABEL_SRC_AUTO);
+
+    if (system_info->host_os_product_type)
+        rrdlabels_add(labels, "_os_product_type", system_info->host_os_product_type, RRDLABEL_SRC_AUTO);
+
+    if (system_info->host_os_product_type_id)
+        rrdlabels_add(labels, "_os_product_type_id", system_info->host_os_product_type_id, RRDLABEL_SRC_AUTO);
 
     if (system_info->kernel_version)
         rrdlabels_add(labels, "_kernel_version", system_info->kernel_version, RRDLABEL_SRC_AUTO);
@@ -433,6 +457,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->host_os_version);
         freez(system_info->host_os_version_id);
         freez(system_info->host_os_detection);
+        freez(system_info->host_os_caption);
+        freez(system_info->host_os_product_type);
+        freez(system_info->host_os_product_type_id);
         freez(system_info->host_cores);
         freez(system_info->host_cpu_freq);
         freez(system_info->host_cpu_model);
@@ -487,6 +514,9 @@ struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *
     copy->host_os_version = system_info_strdupz(system_info->host_os_version);
     copy->host_os_version_id = system_info_strdupz(system_info->host_os_version_id);
     copy->host_os_detection = system_info_strdupz(system_info->host_os_detection);
+    copy->host_os_caption = system_info_strdupz(system_info->host_os_caption);
+    copy->host_os_product_type = system_info_strdupz(system_info->host_os_product_type);
+    copy->host_os_product_type_id = system_info_strdupz(system_info->host_os_product_type_id);
     copy->host_cores = system_info_strdupz(system_info->host_cores);
     copy->host_cpu_freq = system_info_strdupz(system_info->host_cpu_freq);
     copy->host_cpu_model = system_info_strdupz(system_info->host_cpu_model);
