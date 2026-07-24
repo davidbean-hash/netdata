@@ -70,11 +70,11 @@ void rrd_functions_host_init(RRDHOST *host);
 void rrd_functions_host_destroy(RRDHOST *host);
 
 // add a function, to be run from the collector
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
+void rrd_function_add(RRDHOST *host, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
                       HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
                       void *execute_cb_data);
 
-bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal);
+bool rrd_function_del(RRDHOST *host, const char *name, bool from_streaming, bool internal);
 
 // call a function, to be run from anywhere
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,

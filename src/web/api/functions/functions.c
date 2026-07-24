@@ -7,7 +7,6 @@ void global_functions_add(void) {
     // for the other nodes, the origin server should register it
     rrd_function_add_inline(
         localhost,
-        NULL,
         "netdata-streaming",
         10,
         RRDFUNCTIONS_PRIORITY_DEFAULT + 1,
@@ -19,7 +18,6 @@ void global_functions_add(void) {
 
     rrd_function_add_inline(
         localhost,
-        NULL,
         "topology:streaming",
         10,
         RRDFUNCTIONS_PRIORITY_DEFAULT + 1,
@@ -31,7 +29,6 @@ void global_functions_add(void) {
 
     rrd_function_add_inline(
         localhost,
-        NULL,
         "netdata-api-calls",
         10,
         RRDFUNCTIONS_PRIORITY_DEFAULT + 1,
@@ -43,7 +40,6 @@ void global_functions_add(void) {
 
     rrd_function_add_inline(
         localhost,
-        NULL,
         RRDFUNCTIONS_BEARER_GET_TOKEN,
         10,
         RRDFUNCTIONS_PRIORITY_DEFAULT + 3,
@@ -55,7 +51,6 @@ void global_functions_add(void) {
 
     rrd_function_add_inline(
         localhost,
-        NULL,
         "netdata-metrics-cardinality",
         10,
         RRDFUNCTIONS_PRIORITY_DEFAULT + 1,

@@ -53,12 +53,6 @@ inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
     return rrdinstance_labels(ri);
 }
 
-inline DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    if(!ri->rrdset) return NULL;
-    return ri->rrdset->functions_view;
-}
-
 inline RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return ri->rc->rrdhost;

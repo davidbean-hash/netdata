@@ -1105,7 +1105,7 @@ void diskspace_main(void *ptr) {
     netdata_mutex_init(&slow_mountinfo_mutex);
     diskspace_mountpoints_init();
 
-    rrd_function_add_inline(localhost, NULL, "mount-points", 10,
+    rrd_function_add_inline(localhost, "mount-points", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
                             RRDFUNCTIONS_DISKSPACE_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,

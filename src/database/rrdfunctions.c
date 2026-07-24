@@ -207,22 +207,17 @@ static inline bool is_function_dyncfg(const char *name) {
     return false;
 }
 
-static inline RRD_FUNCTION_OPTIONS get_function_options(RRDSET *st, const char *name, const char *tags) {
+static inline RRD_FUNCTION_OPTIONS get_function_options(const char *name, const char *tags) {
     if(is_function_dyncfg(name))
         return RRD_FUNCTION_DYNCFG;
 
-    RRD_FUNCTION_OPTIONS options = st ? RRD_FUNCTION_LOCAL : RRD_FUNCTION_GLOBAL;
-
-    return options | (is_function_restricted(name, tags) ? RRD_FUNCTION_RESTRICTED : 0);
+    return RRD_FUNCTION_GLOBAL | (is_function_restricted(name, tags) ? RRD_FUNCTION_RESTRICTED : 0);
 }
 
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version,
+void rrd_function_add(RRDHOST *host, const char *name, int timeout, int priority, uint32_t version,
                       const char *help, const char *tags,
                       HTTP_ACCESS access, bool sync,
                       rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
-
-    // RRDSET *st may be NULL in this function
-    // to create a GLOBAL function
 
     if(!tags || !*tags) {
         if(strcmp(name, "systemd-journal") == 0)
@@ -230,9 +225,6 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         else
             tags = "top";
     }
-
-    if(st && !st->functions_view)
-        st->functions_view = dictionary_create_view(host->functions);
 
     size_t key_size = rrd_functions_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
@@ -244,7 +236,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .timeout = timeout,
         .version = version,
         .priority = priority,
-        .options = get_function_options(st, name, tags),
+        .options = get_function_options(name, tags),
         .access = access,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
@@ -253,15 +245,12 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions, key, &tmp, sizeof(tmp));
 
-    if(st)
-        dictionary_view_set(st->functions_view, key, item);
-    else
-        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+    rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_acquired_item_release(host->functions, item);
 }
 
-bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal) {
+bool rrd_function_del(RRDHOST *host, const char *name, bool from_streaming, bool internal) {
     if(unlikely(!name || !*name))
         return false;
 
@@ -310,9 +299,6 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     // a specific "unregistered by the plugin" error in that window.
     __atomic_store_n(&rdcf->unregistered, true, __ATOMIC_RELEASE);
 
-    if(st && st->functions_view)
-        dictionary_del(st->functions_view, key);
-
     // Delete from the index while still holding our acquired reference, then
     // release: this unlinks the item before any concurrent re-registration could
     // resurrect it through the conflict callback (a re-add now allocates a fresh
@@ -321,11 +307,10 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     dictionary_del(host->functions, key);
     dictionary_acquired_item_release(host->functions, item);
 
-    if(!st && !is_dyncfg)
+    if(!is_dyncfg)
         stream_send_function_del(host, key);
 
-    if(!st)
-        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+    rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_garbage_collect(host->functions);
 
