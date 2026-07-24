@@ -103,6 +103,10 @@ pub(super) fn default_memory_diagnostics_interval() -> Duration {
     Duration::from_secs(10)
 }
 
+pub(super) fn default_rollup_max_cardinality() -> usize {
+    100
+}
+
 pub(super) fn default_retention_size_of_journal_files() -> ByteSize {
     ByteSize::gb(10)
 }

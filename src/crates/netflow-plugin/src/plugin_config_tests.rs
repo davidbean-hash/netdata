@@ -587,6 +587,195 @@ journal:
     assert!(!cfg.enabled);
 }
 
+fn cfg_with_rollups(rollups: RollupsConfig) -> PluginConfig {
+    PluginConfig {
+        rollups,
+        ..PluginConfig::default()
+    }
+}
+
+#[test]
+fn rollups_config_parses_rules() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+enabled: true
+rules:
+  - name: bytes_by_src_country
+    metric: bytes
+    group_by: SRC_COUNTRY
+  - name: bytes_from_iran
+    metric: bytes
+    filters:
+      SRC_COUNTRY: [IR]
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let cfg = cfg_with_rollups(rollups);
+    cfg.validate().expect("rollups config should validate");
+    assert!(cfg.rollups.enabled);
+    assert_eq!(cfg.rollups.rules.len(), 2);
+    assert_eq!(cfg.rollups.rules[0].metric, RollupMetric::Bytes);
+    assert_eq!(
+        cfg.rollups.rules[0].group_by.as_deref(),
+        Some("SRC_COUNTRY")
+    );
+    assert_eq!(cfg.rollups.rules[0].max_cardinality, 100);
+    assert_eq!(
+        cfg.rollups.rules[1].filters.get("SRC_COUNTRY"),
+        Some(&vec!["IR".to_string()])
+    );
+}
+
+#[test]
+fn rollups_config_defaults_to_empty_enabled() {
+    let cfg = PluginConfig::default();
+    assert!(cfg.rollups.enabled);
+    assert!(cfg.rollups.rules.is_empty());
+}
+
+#[test]
+fn rollups_config_rejects_unknown_group_by_field() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: bad
+    metric: bytes
+    group_by: NOT_A_FIELD
+"#,
+    )
+    .expect("rollups config should parse");
+
+    assert!(cfg_with_rollups(rollups).validate().is_err());
+}
+
+#[test]
+fn rollups_config_rejects_canonical_but_uncaptured_group_by_field() {
+    // SAMPLING_RATE is a canonical flow field but is never emitted on the
+    // capture path, so a rollup grouping on it would silently produce only an
+    // "unknown" dimension. It must be rejected at config time.
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: by_sampling_rate
+    metric: bytes
+    group_by: SAMPLING_RATE
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("uncaptured group_by field must be rejected");
+    assert!(err.to_string().contains("not available for rollups"));
+}
+
+#[test]
+fn rollups_config_rejects_canonical_but_uncaptured_filter_field() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: filter_sampling_rate
+    metric: bytes
+    filters:
+      SAMPLING_RATE: ["1024"]
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("uncaptured filter field must be rejected");
+    assert!(err.to_string().contains("not available for rollups"));
+}
+
+#[test]
+fn rollups_config_accepts_captured_fields() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: bytes_by_country
+    metric: bytes
+    group_by: SRC_COUNTRY
+    filters:
+      DST_AS: ["64500"]
+"#,
+    )
+    .expect("rollups config should parse");
+
+    cfg_with_rollups(rollups)
+        .validate()
+        .expect("captured fields must validate");
+}
+
+#[test]
+fn rollups_config_rejects_empty_filter_value_list() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: empty_filter
+    metric: bytes
+    filters:
+      SRC_COUNTRY: []
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("empty filter value list must be rejected");
+    assert!(err.to_string().contains("empty value list"));
+}
+
+#[test]
+fn rollups_config_rejects_duplicate_rule_names() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: dup
+    metric: bytes
+  - name: dup
+    metric: packets
+"#,
+    )
+    .expect("rollups config should parse");
+
+    assert!(cfg_with_rollups(rollups).validate().is_err());
+}
+
+#[test]
+fn rollups_config_rejects_colliding_sanitized_chart_ids() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: bytes/country
+    metric: bytes
+  - name: bytes_country
+    metric: packets
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("colliding sanitized chart ids must be rejected");
+    assert!(err.to_string().contains("collides with another rule"));
+}
+
+#[test]
+fn rollups_config_rejects_unknown_fields() {
+    let result: Result<RollupsConfig, _> = serde_yaml::from_str(
+        r#"
+rules:
+  - name: bad
+    metric: bytes
+    bogus: true
+"#,
+    );
+
+    assert!(result.is_err());
+}
+
 #[test]
 fn stock_netflow_yaml_parses_and_validates() {
     let yaml = include_str!("../configs/netflow.yaml");

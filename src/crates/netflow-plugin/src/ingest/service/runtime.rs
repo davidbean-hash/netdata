@@ -245,6 +245,10 @@ impl IngestService {
         record: &crate::flow::FlowRecord,
         observe_tiers: bool,
     ) -> bool {
+        if let Some(engine) = &self.rollup_engine {
+            engine.observe(record);
+        }
+
         let Ok(active_path) =
             self.write_raw_record_internal(receive_time_usec, source_realtime_usec, record)
         else {

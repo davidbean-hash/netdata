@@ -28,7 +28,7 @@ use twox_hash::XxHash64;
 #[allow(unused_imports)]
 pub(crate) use contribution::{
     FacetFileContribution, FacetValueSink, append_record_facet_values,
-    facet_contribution_from_flow_fields,
+    capturable_facet_field_names, facet_contribution_from_flow_fields,
 };
 use sidecar::{delete_sidecar_files, search_sidecar, sidecar_path, write_sidecar_files};
 use store::{FacetStore, FacetStoreValueRef, PersistedFacetStore};

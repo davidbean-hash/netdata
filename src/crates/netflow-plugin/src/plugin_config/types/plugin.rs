@@ -30,6 +30,10 @@ pub(crate) struct PluginConfig {
     #[serde(default, rename = "charts")]
     pub(crate) charts: ChartsConfig,
 
+    #[arg(skip)]
+    #[serde(default, rename = "rollups")]
+    pub(crate) rollups: RollupsConfig,
+
     #[arg(hide = true, help = "Collection interval in seconds (ignored)")]
     #[serde(skip)]
     pub(crate) _update_frequency: Option<u32>,
@@ -48,6 +52,7 @@ impl Default for PluginConfig {
             journal: JournalConfig::default(),
             enrichment: EnrichmentConfig::default(),
             charts: ChartsConfig::default(),
+            rollups: RollupsConfig::default(),
             _update_frequency: None,
             _netdata_env: NetdataEnv::default(),
         }
