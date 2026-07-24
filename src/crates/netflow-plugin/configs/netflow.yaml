@@ -113,26 +113,28 @@ charts:
 rollups:
   enabled: true
   rules: []
-  # Examples (uncomment and adapt):
+  # To define rules, replace the `rules: []` line above with the block below
+  # (uncomment and adapt). Every list item must stay indented under `rules:`.
   #
-  # # bytes/s per source country, across all countries
-  # - name: bytes_by_src_country
-  #   metric: bytes
-  #   group_by: SRC_COUNTRY
+  # rules:
+  #   # bytes/s per source country, across all countries
+  #   - name: bytes_by_src_country
+  #     metric: bytes
+  #     group_by: SRC_COUNTRY
   #
-  # # bytes/s originating from a specific country
-  # - name: bytes_from_iran
-  #   metric: bytes
-  #   filters:
-  #     SRC_COUNTRY: [IR]
+  #   # bytes/s originating from a specific country
+  #   - name: bytes_from_iran
+  #     metric: bytes
+  #     filters:
+  #       SRC_COUNTRY: [IR]
   #
-  # # packets/s per destination AS for two exporters only
-  # - name: packets_by_dst_as
-  #   metric: packets
-  #   group_by: DST_AS
-  #   filters:
-  #     EXPORTER_IP: ["10.0.0.1", "10.0.0.2"]
-  #   max_cardinality: 200
+  #   # packets/s per destination AS for two exporters only
+  #   - name: packets_by_dst_as
+  #     metric: packets
+  #     group_by: DST_AS
+  #     filters:
+  #       EXPORTER_IP: ["10.0.0.1", "10.0.0.2"]
+  #     max_cardinality: 200
 
 # Optional advanced enrichment modules.
 # Keep disabled unless explicitly configured.

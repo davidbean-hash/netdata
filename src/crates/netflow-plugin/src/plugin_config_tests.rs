@@ -650,6 +650,65 @@ rules:
 }
 
 #[test]
+fn rollups_config_rejects_canonical_but_uncaptured_group_by_field() {
+    // SAMPLING_RATE is a canonical flow field but is never emitted on the
+    // capture path, so a rollup grouping on it would silently produce only an
+    // "unknown" dimension. It must be rejected at config time.
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: by_sampling_rate
+    metric: bytes
+    group_by: SAMPLING_RATE
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("uncaptured group_by field must be rejected");
+    assert!(err.to_string().contains("not available for rollups"));
+}
+
+#[test]
+fn rollups_config_rejects_canonical_but_uncaptured_filter_field() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: filter_sampling_rate
+    metric: bytes
+    filters:
+      SAMPLING_RATE: ["1024"]
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("uncaptured filter field must be rejected");
+    assert!(err.to_string().contains("not available for rollups"));
+}
+
+#[test]
+fn rollups_config_accepts_captured_fields() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: bytes_by_country
+    metric: bytes
+    group_by: SRC_COUNTRY
+    filters:
+      DST_AS: ["64500"]
+"#,
+    )
+    .expect("rollups config should parse");
+
+    cfg_with_rollups(rollups)
+        .validate()
+        .expect("captured fields must validate");
+}
+
+#[test]
 fn rollups_config_rejects_duplicate_rule_names() {
     let rollups: RollupsConfig = serde_yaml::from_str(
         r#"

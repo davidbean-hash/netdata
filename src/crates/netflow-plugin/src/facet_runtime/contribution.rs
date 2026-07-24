@@ -265,6 +265,67 @@ pub(crate) fn append_record_facet_values(sink: &mut impl FacetValueSink, record:
     append_record_virtual_icmp_fields(sink, record);
 }
 
+/// The set of field names `append_record_facet_values` can emit. This is a
+/// subset of the canonical flow fields: several canonical fields (e.g.
+/// `SAMPLING_RATE`, the geo lat/long fields, the raw ICMP type/code fields) are
+/// never surfaced through the facet sink. Callers that let users select fields
+/// (such as the rollup layer) validate against this set so a field that would
+/// silently produce no value is rejected instead of yielding empty output.
+///
+/// Derived by walking the real emitters with a fully-populated probe record, so
+/// it stays in sync automatically when the `append_record_*` helpers change.
+pub(crate) fn capturable_facet_field_names() -> BTreeSet<&'static str> {
+    use crate::flow::FlowPresence;
+    use std::net::Ipv4Addr;
+
+    #[derive(Default)]
+    struct NameSink(BTreeSet<&'static str>);
+    impl FacetValueSink for NameSink {
+        fn insert_text_static(&mut self, field: &'static str, _value: &str) {
+            self.0.insert(field);
+        }
+        fn insert_u8_static(&mut self, field: &'static str, _value: u8) {
+            self.0.insert(field);
+        }
+        fn insert_u8_present_static(&mut self, field: &'static str, _value: u8) {
+            self.0.insert(field);
+        }
+        fn insert_u16_static(&mut self, field: &'static str, _value: u16) {
+            self.0.insert(field);
+        }
+        fn insert_u32_static(&mut self, field: &'static str, _value: u32) {
+            self.0.insert(field);
+        }
+        fn insert_u64_static(&mut self, field: &'static str, _value: u64) {
+            self.0.insert(field);
+        }
+        fn insert_ip_static(&mut self, field: &'static str, _value: Option<IpAddr>) {
+            self.0.insert(field);
+        }
+    }
+
+    // Populate every presence flag and the value-gated optionals (prefixes,
+    // MACs) so all conditional branches in the emitters fire.
+    let ip = IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1));
+    let mut record = FlowRecord {
+        presence: FlowPresence::all(),
+        src_prefix: Some(ip),
+        dst_prefix: Some(ip),
+        src_mask: 24,
+        dst_mask: 24,
+        src_mac: [1, 2, 3, 4, 5, 6],
+        dst_mac: [1, 2, 3, 4, 5, 6],
+        protocol: 1,
+        ..FlowRecord::default()
+    };
+    record.icmpv4_type = 8;
+    record.icmpv6_type = 128;
+
+    let mut sink = NameSink::default();
+    append_record_facet_values(&mut sink, &record);
+    sink.0
+}
+
 #[allow(dead_code)]
 pub(crate) fn facet_contribution_from_encoded_fields<'a, I>(fields: I) -> FacetFileContribution
 where
@@ -510,6 +571,39 @@ mod tests {
             .iter()
             .map(|(field, store)| (field, store.collect_strings(None)))
             .collect()
+    }
+
+    #[test]
+    fn capturable_facet_field_names_covers_emitted_fields_only() {
+        let capturable = capturable_facet_field_names();
+        // Always-emitted, presence-gated, and value-gated fields must all be
+        // reported as capturable.
+        for field in [
+            "SRC_COUNTRY",
+            "DST_AS",
+            "EXPORTER_IP",
+            "ETYPE",
+            "SRC_VLAN",
+            "SRC_MAC",
+            "SRC_PREFIX",
+            "TCP_FLAGS",
+        ] {
+            assert!(capturable.contains(field), "{field} should be capturable");
+        }
+        // Canonical fields the facet sink never emits must be absent.
+        for field in [
+            "SAMPLING_RATE",
+            "SRC_GEO_LATITUDE",
+            "DST_GEO_LONGITUDE",
+            "ICMPV4_TYPE",
+            "ICMPV6_CODE",
+            "FLOW_START_USEC",
+        ] {
+            assert!(
+                !capturable.contains(field),
+                "{field} should not be capturable"
+            );
+        }
     }
 
     #[test]
