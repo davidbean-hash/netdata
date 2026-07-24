@@ -22,20 +22,29 @@ static bool mcp_api_key_generate_and_save(void) {
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
 
+    // Prepare the UUID with newline before touching the file
+    char buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 2]; // +1 for newline, +1 for null
+    snprintf(buffer, sizeof(buffer), "%s\n", mcp_dev_preview_api_key);
+    const ssize_t to_write = MCP_DEV_PREVIEW_API_KEY_LENGTH + 1; // +1 for newline
+
     struct stat st;
-    if (stat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
+#ifdef O_NOFOLLOW
+    // O_NOFOLLOW refuses to open a symlink planted at the path (arbitrary file truncation, CWE-59).
+    // O_NONBLOCK prevents a FIFO/blocking special file planted at the path from hanging startup.
+    // O_TRUNC is omitted so truncation only happens after fstat() confirms a regular file.
+    if (lstat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
         netdata_log_error("MCP: API key file %s is not a regular file", path);
         return false;
     }
 
-    // Validate the opened object before truncating it.
-    int fd = open(path, O_WRONLY | O_CREAT | O_NONBLOCK, 0600);
+    int fd = open(path, O_WRONLY | O_CREAT | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW, 0600);
     if (fd == -1) {
-        netdata_log_error("MCP: Failed to create API key file %s: %s", 
+        netdata_log_error("MCP: Failed to create API key file %s: %s",
                          path, strerror(errno));
         return false;
     }
 
+    // Validate the opened object before truncating it.
     if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
         netdata_log_error("MCP: API key file %s is not a regular file", path);
         close(fd);
@@ -47,19 +56,15 @@ static bool mcp_api_key_generate_and_save(void) {
         close(fd);
         return false;
     }
-    
-    // Write the UUID with newline
-    char buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 2]; // +1 for newline, +1 for null
-    snprintf(buffer, sizeof(buffer), "%s\n", mcp_dev_preview_api_key);
-    
-    ssize_t written = write(fd, buffer, MCP_DEV_PREVIEW_API_KEY_LENGTH + 1); // +1 for newline
-    if (written != (ssize_t)(MCP_DEV_PREVIEW_API_KEY_LENGTH + 1)) {
+
+    ssize_t written = write(fd, buffer, to_write);
+    if (written != to_write) {
         netdata_log_error("MCP: Failed to write API key to file: %s", strerror(errno));
         close(fd);
         unlink(path);
         return false;
     }
-    
+
     // Ensure file permissions are correct (only owner can read/write)
     if (fchmod(fd, 0600) == -1) {
         netdata_log_error("MCP: Failed to set permissions on API key file: %s", strerror(errno));
@@ -69,7 +74,46 @@ static bool mcp_api_key_generate_and_save(void) {
     }
 
     close(fd);
-    
+#else
+    // Without O_NOFOLLOW: write to a uniquely named temp file then rename atomically.
+    // mkstemp() creates a fresh, unpredictable, 0600 file, so a symlink planted at the
+    // destination cannot redirect the write, and rename() does not follow a symlink there.
+    char tmp_path[PATH_MAX];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp.XXXXXX", path);
+
+    int fd = mkstemp(tmp_path);
+    if (fd == -1) {
+        netdata_log_error("MCP: Failed to create temporary API key file %s: %s",
+                         tmp_path, strerror(errno));
+        return false;
+    }
+
+    ssize_t written = write(fd, buffer, to_write);
+    if (written != to_write) {
+        netdata_log_error("MCP: Failed to write API key to file: %s", strerror(errno));
+        close(fd);
+        unlink(tmp_path);
+        return false;
+    }
+
+    // Ensure file permissions are correct (only owner can read/write)
+    if (fchmod(fd, 0600) == -1) {
+        netdata_log_error("MCP: Failed to set permissions on API key file: %s", strerror(errno));
+        close(fd);
+        unlink(tmp_path);
+        return false;
+    }
+
+    close(fd);
+
+    if (rename(tmp_path, path) != 0) {
+        netdata_log_error("MCP: Failed to rename temporary API key file %s to %s: %s",
+                         tmp_path, path, strerror(errno));
+        unlink(tmp_path);
+        return false;
+    }
+#endif
+
     netdata_log_info("MCP: Generated new developer preview API key");
     return true;
 }
@@ -80,12 +124,22 @@ static bool mcp_api_key_load(void) {
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
 
     struct stat st;
+    int fd = -1;
+#ifdef O_NOFOLLOW
+    // O_NOFOLLOW/lstat refuse to read through a symlink planted at the path (CWE-59).
+    // O_NONBLOCK prevents a FIFO/blocking special file planted at the path from hanging startup.
+    if (lstat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
+        netdata_log_error("MCP: API key file %s is not a regular file", path);
+        return false;
+    }
+    fd = open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW);
+#else
     if (stat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
         netdata_log_error("MCP: API key file %s is not a regular file", path);
         return false;
     }
-
-    int fd = open(path, O_RDONLY | O_NONBLOCK);
+    fd = open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+#endif
     if (fd == -1) {
         if (errno == ENOENT) {
             // File doesn't exist, this is expected on first run
