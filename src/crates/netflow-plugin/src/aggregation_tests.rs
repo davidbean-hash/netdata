@@ -224,7 +224,7 @@ fn emitter_defines_chart_then_updates_incrementally() {
 
     let cycle1 = emitter.render(&first, now);
     assert!(cycle1.contains(
-        "CHART netflow.rollup_bytes_by_country '' 'Netflow Rollup bytes_by_country' 'bytes/s' 'rollups' 'netdata.netflow.rollup_bytes_by_country' stacked 90000 1\n"
+        "CHART netflow.rollup_bytes_by_country '' 'Netflow Rollup bytes_by_country' 'bytes/s' 'rollups' 'netflow.rollup_bytes_by_country' stacked 90000 1\n"
     ));
     assert!(cycle1.contains("DIMENSION IR 'IR' incremental 1 1\n"));
     assert!(cycle1.contains("BEGIN netflow.rollup_bytes_by_country 1000000\n"));
@@ -246,6 +246,31 @@ fn emitter_defines_chart_then_updates_incrementally() {
     assert!(cycle3.contains("CHART netflow.rollup_bytes_by_country"));
     assert!(cycle3.contains("DIMENSION US 'US' incremental 1 1\n"));
     assert!(cycle3.contains("SET US = 200\n"));
+}
+
+#[test]
+fn emitter_uses_trimmed_rule_name_for_chart_id() {
+    // The validator trims the name before sanitizing to a chart id; the emitter
+    // must trim identically so the runtime chart id matches the id validation
+    // deduplicated on (otherwise two "distinct" rules could collide at runtime).
+    let cfg = config(vec![rule(
+        "  padded  ",
+        None,
+        &[],
+        RollupMetric::Bytes,
+        100,
+    )]);
+    let engine = RollupEngine::from_config(&cfg).unwrap();
+    let now = UNIX_EPOCH + Duration::from_secs(100);
+
+    engine.observe(&record("IR", 10, 1));
+    let snapshot = engine.snapshot();
+    let mut emitter = RollupEmitter::new(&snapshot, Duration::from_secs(1));
+    let out = emitter.render(&snapshot, now);
+
+    assert!(out.contains("CHART netflow.rollup_padded "));
+    assert!(out.contains("'netflow.rollup_padded'"));
+    assert!(!out.contains("rollup___padded"));
 }
 
 #[test]

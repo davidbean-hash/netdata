@@ -43,13 +43,18 @@ pub(super) fn validate_rollups(cfg: &PluginConfig) -> Result<()> {
             }
         }
 
-        for field in rule.filters.keys() {
+        for (field, values) in &rule.filters {
             if !canonical.contains(field.as_str()) {
                 bail!("rollups.rules['{name}']: filter field '{field}' is not a known flow field");
             }
             if !capturable.contains(field.as_str()) {
                 bail!(
                     "rollups.rules['{name}']: filter field '{field}' is a known flow field but is not available for rollups (it is never captured on the ingest path)"
+                );
+            }
+            if values.is_empty() {
+                bail!(
+                    "rollups.rules['{name}']: filter field '{field}' has an empty value list, which matches no flows; provide at least one value or remove the filter"
                 );
             }
         }

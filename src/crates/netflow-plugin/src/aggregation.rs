@@ -57,7 +57,9 @@ impl CompiledRule {
             })
             .collect();
         Self {
-            name: rule.name.clone(),
+            // Normalize once so the chart id derived here matches the id the
+            // validator deduplicated on (it trims before sanitizing).
+            name: rule.name.trim().to_string(),
             group_by,
             filters,
             metric: rule.metric,
@@ -303,7 +305,7 @@ impl RollupEmitter {
             .iter()
             .map(|snapshot| ChartEmitState {
                 chart_id: format!("netflow.rollup_{}", sanitize_id(&snapshot.name)),
-                context: format!("netdata.netflow.rollup_{}", sanitize_id(&snapshot.name)),
+                context: format!("netflow.rollup_{}", sanitize_id(&snapshot.name)),
                 title: format!("Netflow Rollup {}", escape_protocol_text(&snapshot.name)),
                 units: snapshot.metric.units(),
                 chart_type: if snapshot.grouped { "stacked" } else { "line" },

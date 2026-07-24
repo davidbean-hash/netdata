@@ -709,6 +709,25 @@ rules:
 }
 
 #[test]
+fn rollups_config_rejects_empty_filter_value_list() {
+    let rollups: RollupsConfig = serde_yaml::from_str(
+        r#"
+rules:
+  - name: empty_filter
+    metric: bytes
+    filters:
+      SRC_COUNTRY: []
+"#,
+    )
+    .expect("rollups config should parse");
+
+    let err = cfg_with_rollups(rollups)
+        .validate()
+        .expect_err("empty filter value list must be rejected");
+    assert!(err.to_string().contains("empty value list"));
+}
+
+#[test]
 fn rollups_config_rejects_duplicate_rule_names() {
     let rollups: RollupsConfig = serde_yaml::from_str(
         r#"
