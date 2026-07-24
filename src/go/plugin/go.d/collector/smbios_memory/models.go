@@ -79,8 +79,10 @@ func memoryDeviceSize(raw uint16, s smbiosStructure) uint64 {
 
 // memoryDeviceSpeed returns the module speed in MT/s. The configured (running)
 // speed is preferred when available; otherwise the maximum rated speed is used.
-// 0 means unknown. For the speed fields only 0x0000 (unknown) and 0xFFFF
-// (reserved) are special values.
+// 0 means unknown. For the speed fields 0x0000 means unknown and 0xFFFF means
+// "65535 MT/s or greater, see the Extended Speed field" (SMBIOS 3.3+); the
+// extended fields are not consulted since no current hardware reaches that, so
+// 0xFFFF is treated as unknown.
 func memoryDeviceSpeed(s smbiosStructure) uint64 {
 	if v, ok := s.u16(off17ConfiguredSpeed); ok && v != 0 && v != 0xFFFF {
 		return uint64(v)
