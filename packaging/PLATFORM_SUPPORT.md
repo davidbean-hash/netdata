@@ -69,7 +69,6 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Alma Linux               | 9.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Alma Linux               | 8.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Amazon Linux             | 2023           | x86\_64, AArch64              |                                                                                                                |
-| Amazon Linux             | 2              | x86\_64, AArch64              |                                                                                                                |
 | CentOS                   | 7.x            | x86\_64                       |                                                                                                                |
 | Docker                   | 19.03 or newer | x86\_64, ARMv7, AArch64       | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
 | Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
