@@ -35,16 +35,16 @@ int rrdfunctions_verify_access_unittest(void) {
     }
 
     // A protected function mirroring systemd-journal's requirements.
-    rrd_function_add(host, NULL, "protected-fn", 10, 0, 1, "protected", "logs",
+    rrd_function_add(host, "protected-fn", 10, 0, 1, "protected", "logs",
                      HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
                      true, rrdfunctions_unittest_noop_cb, NULL);
 
     // A restricted function: name starting with "__" flags RRD_FUNCTION_RESTRICTED.
-    rrd_function_add(host, NULL, "__restricted-fn", 10, 0, 1, "restricted", "top",
+    rrd_function_add(host, "__restricted-fn", 10, 0, 1, "restricted", "top",
                      HTTP_ACCESS_NONE, true, rrdfunctions_unittest_noop_cb, NULL);
 
     // A public function requiring nothing — baseline that the gate does not over-block.
-    rrd_function_add(host, NULL, "public-fn", 10, 0, 1, "public", "top",
+    rrd_function_add(host, "public-fn", 10, 0, 1, "public", "top",
                      HTTP_ACCESS_NONE, true, rrdfunctions_unittest_noop_cb, NULL);
 
     struct {
@@ -138,9 +138,9 @@ int rrdfunctions_verify_access_unittest(void) {
                     i, cases[i].fn, (unsigned)cases[i].user_access, cases[i].allow_restricted, code);
     }
 
-    rrd_function_del(host, NULL, "protected-fn", false, true);
-    rrd_function_del(host, NULL, "__restricted-fn", false, true);
-    rrd_function_del(host, NULL, "public-fn", false, true);
+    rrd_function_del(host, "protected-fn", false, true);
+    rrd_function_del(host, "__restricted-fn", false, true);
+    rrd_function_del(host, "public-fn", false, true);
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");

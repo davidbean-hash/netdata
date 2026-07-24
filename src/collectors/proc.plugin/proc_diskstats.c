@@ -1407,7 +1407,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
                 SIMPLE_PATTERN_EXACT, true);
 
-        rrd_function_add_inline(localhost, NULL, "block-devices", 10,
+        rrd_function_add_inline(localhost, "block-devices", 10,
                                 RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
                                 RRDFUNCTIONS_DISKSTATS_HELP,
                                 "top", HTTP_ACCESS_ANONYMOUS_DATA,

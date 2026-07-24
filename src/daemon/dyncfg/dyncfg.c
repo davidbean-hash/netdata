@@ -385,7 +385,6 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
     rrd_collector_started();
     rrd_function_add(
         host,
-        NULL,
         string2str(df->function),
         120,
         1000,
@@ -424,7 +423,7 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(item) {
         DYNCFG *df = dictionary_acquired_item_value(item);
-        rrd_function_del(host, NULL, string2str(df->function), false, true);
+        rrd_function_del(host, string2str(df->function), false, true);
 
         bool garbage_collect = false;
         if(df->dyncfg.saves == 0) {

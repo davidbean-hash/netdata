@@ -1721,7 +1721,7 @@ void netdev_main(void *ptr_is_null __maybe_unused)
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
         virtual_device_collect_delay_secs = 300;
 
-    rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,
+    rrd_function_add_inline(localhost, "network-interfaces", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
                             RRDFUNCTIONS_NETDEV_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
