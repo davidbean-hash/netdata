@@ -1,0 +1,12 @@
+# markdownlint configuration honored by Codacy.
+# See https://docs.codacy.com/repositories-configure/configuring-code-patterns/
+#
+# All other rules keep their defaults (markdownlint's `default` is `true`),
+# so only MD043 is changed here.
+#
+# MD043 (required-heading-structure) is disabled: Codacy's server-side default
+# enables it with an empty required-headings list, which markdownlint treats as
+# "the document must contain no headings". That flags the first heading of every
+# Markdown file repo-wide (false positives). MD043 is only meaningful with an
+# exact heading template, which this monorepo does not use.
+MD043: false
