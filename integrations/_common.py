@@ -171,11 +171,14 @@ def load_collectors(sources=None):
             if is_prometheus_metadata(path):
                 base_module = data['modules'][0]
                 existing_ids = {m['meta'].get('id') for m in data['modules']}
+                # A colliding or schema-invalid generated module is dropped, but the
+                # warn() also makes regeneration fail (strict-warnings policy), so a
+                # malformed profile surfaces loudly instead of silently losing a page.
                 for offset, extra in enumerate(generate_profile_modules(base_module)):
                     extra_id = extra['meta'].get('id')
                     if extra_id in existing_ids:
                         warn(f'Generated prometheus profile module id "{extra_id}" collides with an '
-                             f'existing module; skipping.', path)
+                             f'existing module; dropping it.', path)
                         continue
                     try:
                         COLLECTOR_VALIDATOR.validate({'plugin_name': data['plugin_name'], 'modules': [extra]})

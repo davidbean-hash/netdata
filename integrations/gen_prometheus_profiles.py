@@ -265,6 +265,11 @@ def build_profile_module(base_module, profile, profile_name):
     display_name = meta_block['name']
 
     module = deepcopy(base_module)
+    # base_module may already carry load_collectors' internal bookkeeping keys
+    # (a pathlib.Path, repo, index, ...); drop them so the generated module is a
+    # clean metadata shape that load_collectors re-tags and schema-validates.
+    for internal in ('_src_path', '_repo', '_index', 'integration_type'):
+        module.pop(internal, None)
 
     module['meta']['id'] = f'collector-go.d.plugin-prometheus-{_slug(app)}'
     module['meta']['community'] = True
