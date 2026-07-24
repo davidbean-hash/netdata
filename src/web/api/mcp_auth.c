@@ -27,8 +27,8 @@ static bool mcp_api_key_generate_and_save(void) {
     snprintf(buffer, sizeof(buffer), "%s\n", mcp_dev_preview_api_key);
     const ssize_t to_write = MCP_DEV_PREVIEW_API_KEY_LENGTH + 1; // +1 for newline
 
-    struct stat st;
 #ifdef O_NOFOLLOW
+    struct stat st;
     // O_NOFOLLOW refuses to open a symlink planted at the path (arbitrary file truncation, CWE-59).
     // O_NONBLOCK prevents a FIFO/blocking special file planted at the path from hanging startup.
     // O_TRUNC is omitted so truncation only happens after fstat() confirms a regular file.
