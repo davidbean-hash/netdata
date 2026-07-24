@@ -190,6 +190,17 @@ if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
   run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
 fi
 
+# The otel-signal-viewer plugin was removed from the agent. Delete the leftover
+# binary and its stock configuration from an overlay upgrade so the obsolete
+# plugin cannot linger in plugins.d.
+for f in \
+  "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" \
+  "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/otel-signal-viewer.yaml"; do
+  if [ -e "${f}" ] || [ -L "${f}" ]; then
+    run rm -f "${f}"
+  fi
+done
+
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"
