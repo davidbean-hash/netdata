@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package smbios_memory
 
 // defaultDMIPath is the kernel-exported raw SMBIOS structure table. It holds

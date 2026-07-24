@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package smbios_memory
 
 import (
@@ -13,6 +15,16 @@ func (c *Collector) collect() error {
 		return err
 	}
 
+	// Device locators are normally unique per slot; disambiguate any duplicates
+	// from a non-conforming BIOS with the SMBIOS handle so each populated DIMM
+	// maps to its own chart instance instead of colliding on one.
+	locatorCount := map[string]int{}
+	for _, d := range devices {
+		if d.present {
+			locatorCount[d.locator]++
+		}
+	}
+
 	for _, d := range devices {
 		if !d.present {
 			// Empty slot: leave a gap rather than emitting zeroed inventory.
@@ -20,7 +32,7 @@ func (c *Collector) collect() error {
 		}
 
 		labels := []string{
-			c.dimmLocation(d),
+			c.dimmLocation(d, locatorCount[d.locator] > 1),
 			d.bankLocator,
 			d.memoryType,
 			d.formFactor,
@@ -65,11 +77,15 @@ func (c *Collector) readMemoryDevices() ([]memoryDevice, error) {
 	return devices, nil
 }
 
-// dimmLocation returns a stable identity for a DIMM, falling back to the SMBIOS
-// handle when the firmware does not provide a device locator.
-func (c *Collector) dimmLocation(d memoryDevice) string {
-	if d.locator != "" {
-		return d.locator
+// dimmLocation returns a stable identity for a DIMM. It falls back to the SMBIOS
+// handle when the firmware provides no device locator, and appends the handle
+// when the locator is not unique among populated slots.
+func (c *Collector) dimmLocation(d memoryDevice, ambiguous bool) string {
+	if d.locator == "" {
+		return fmt.Sprintf("handle_%#04x", d.handle)
 	}
-	return fmt.Sprintf("handle_%#04x", d.handle)
+	if ambiguous {
+		return fmt.Sprintf("%s_%#04x", d.locator, d.handle)
+	}
+	return d.locator
 }

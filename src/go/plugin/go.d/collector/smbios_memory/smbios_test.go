@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package smbios_memory
 
 import (
@@ -182,6 +184,17 @@ func TestParseMemoryDevicePresence(t *testing.T) {
 	unknown := parseMemoryDevice(build(0xFFFF))
 	assert.True(t, unknown.present)
 	assert.Equal(t, uint64(0), unknown.sizeBytes)
+}
+
+func TestDimmLocation(t *testing.T) {
+	c := &Collector{}
+
+	// Unique locator: used as-is.
+	assert.Equal(t, "DIMM_A1", c.dimmLocation(memoryDevice{locator: "DIMM_A1", handle: 0x10}, false))
+	// Missing locator: falls back to the handle.
+	assert.Equal(t, "handle_0x0011", c.dimmLocation(memoryDevice{handle: 0x11}, false))
+	// Duplicate locator: disambiguated with the handle.
+	assert.Equal(t, "DIMM 0_0x0012", c.dimmLocation(memoryDevice{locator: "DIMM 0", handle: 0x12}, true))
 }
 
 func TestMemoryTypeAndFormFactorDecoding(t *testing.T) {

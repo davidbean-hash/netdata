@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package smbios_memory
 
 // memoryDevice is the inventory extracted from a single SMBIOS Memory Device
