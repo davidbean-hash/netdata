@@ -19,10 +19,14 @@ import (
 // chart template. Template is captured as an un-decoded yaml.Node so a strict
 // decode (KnownFields) still accepts the legitimate `template:` key and rejects
 // unknown keys, without typed-decoding or validating the heavy chart tree at
-// load time.
+// load time. Meta is presentation-only metadata (integration display name, icon,
+// categories, …) consumed by the out-of-band integrations documentation
+// generator; the runtime does not use it, but it is captured as an un-decoded
+// yaml.Node so a strict decode still accepts the optional `meta:` key.
 type profileHeader struct {
 	Match    string    `yaml:"match"`
 	App      string    `yaml:"app,omitempty"`
+	Meta     yaml.Node `yaml:"meta,omitempty"`
 	Template yaml.Node `yaml:"template"`
 }
 
@@ -90,6 +94,7 @@ func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
 	var doc struct {
 		Match    string         `yaml:"match"`
 		App      string         `yaml:"app,omitempty"`
+		Meta     yaml.Node      `yaml:"meta,omitempty"`
 		Template charttpl.Group `yaml:"template"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(raw))

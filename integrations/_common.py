@@ -161,6 +161,23 @@ def load_collectors(sources=None):
             item['_index'] = idx
             ret.append(item)
 
+        # Prometheus chart profiles are the single source of truth for their own
+        # integration pages: generate one collector module entry per profile from
+        # the profile YAML (see gen_prometheus_profiles) so each yields a catalog
+        # page automatically, without hand-written per-exporter metadata.
+        if data.get('modules'):
+            from gen_prometheus_profiles import generate_profile_modules, is_prometheus_metadata
+
+            if is_prometheus_metadata(path):
+                base_module = data['modules'][0]
+                for offset, extra in enumerate(generate_profile_modules(base_module)):
+                    extra['meta']['plugin_name'] = data['plugin_name']
+                    extra['integration_type'] = 'collector'
+                    extra['_src_path'] = path
+                    extra['_repo'] = repo
+                    extra['_index'] = len(data['modules']) + offset
+                    ret.append(extra)
+
     return ret
 
 
