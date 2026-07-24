@@ -294,6 +294,39 @@ fn emitter_escapes_untrusted_dimension_labels() {
 }
 
 #[test]
+fn emitter_merges_group_values_colliding_on_sanitized_id() {
+    // Two distinct free-text group values that sanitize to the same dimension id
+    // must not overwrite each other: their counters are summed into one line so
+    // no group's traffic is silently dropped from the chart.
+    let cfg = config(vec![rule(
+        "as_names",
+        Some("SRC_AS_NAME"),
+        &[],
+        RollupMetric::Bytes,
+        100,
+    )]);
+    let engine = RollupEngine::from_config(&cfg).unwrap();
+    let now = UNIX_EPOCH + Duration::from_secs(100);
+
+    let mut a = record("", 30, 1);
+    a.src_as_name = "AS-Foo/Bar".to_string();
+    engine.observe(&a);
+    let mut b = record("", 70, 1);
+    b.src_as_name = "AS-Foo Bar".to_string();
+    engine.observe(&b);
+
+    let snapshot = engine.snapshot();
+    let mut emitter = RollupEmitter::new(&snapshot, Duration::from_secs(1));
+    let out = emitter.render(&snapshot, now);
+
+    // Both raw labels sanitize to "AS-Foo_Bar"; exactly one dimension and one
+    // SET line carrying the summed counter (30 + 70) must be emitted.
+    assert_eq!(out.matches("DIMENSION AS-Foo_Bar ").count(), 1);
+    assert_eq!(out.matches("SET AS-Foo_Bar = ").count(), 1);
+    assert!(out.contains("SET AS-Foo_Bar = 100\n"));
+}
+
+#[test]
 fn metric_units_match_rate_semantics() {
     assert_eq!(RollupMetric::Bytes.units(), "bytes/s");
     assert_eq!(RollupMetric::Packets.units(), "packets/s");

@@ -344,15 +344,20 @@ impl ChartEmitState {
         dt: Duration,
         now: SystemTime,
     ) {
-        let dim_ids: Vec<(String, u64)> = snapshot
-            .dimensions
-            .iter()
-            .map(|(label, value)| (sanitize_id(label), *value))
-            .collect();
+        // Distinct raw group labels can sanitize to the same Netdata dimension
+        // id (e.g. "a/b" and "a b" both become "a_b"). Emitting two `SET`s with
+        // the same id in one `BEGIN`/`END` would let Netdata keep only the last,
+        // silently dropping a group's counter. Merge collisions by summing their
+        // cumulative values into a single dimension, keeping the first-seen label
+        // as the display name. Ordered by id for deterministic output.
+        let mut merged: BTreeMap<String, (String, u64)> = BTreeMap::new();
+        for (label, value) in &snapshot.dimensions {
+            let id = sanitize_id(label);
+            let entry = merged.entry(id).or_insert_with(|| (label.clone(), 0));
+            entry.1 = entry.1.saturating_add(*value);
+        }
 
-        let has_new_dim = dim_ids
-            .iter()
-            .any(|(id, _)| !self.defined_dims.contains(id));
+        let has_new_dim = merged.keys().any(|id| !self.defined_dims.contains(id));
 
         // (Re)send the chart definition whenever a new dimension appears. This
         // is how Netdata learns about dimensions added after the first cycle.
@@ -367,17 +372,17 @@ impl ChartEmitState {
                 ROLLUP_CHART_PRIORITY,
                 update_every.as_secs().max(1),
             ));
-            for (label, (id, _)) in snapshot.dimensions.iter().zip(dim_ids.iter()) {
+            for (id, (label, _)) in &merged {
                 out.push_str(&format!(
                     "DIMENSION {} '{}' incremental 1 1\n",
                     id,
-                    escape_protocol_text(&label.0)
+                    escape_protocol_text(label)
                 ));
                 self.defined_dims.insert(id.clone());
             }
         }
 
-        if dim_ids.is_empty() {
+        if merged.is_empty() {
             return;
         }
 
@@ -386,7 +391,7 @@ impl ChartEmitState {
             self.chart_id,
             dt.as_micros().max(1),
         ));
-        for (id, value) in &dim_ids {
+        for (id, (_, value)) in &merged {
             out.push_str(&format!("SET {} = {}\n", id, clamp_to_i64(*value)));
         }
         let secs = now
