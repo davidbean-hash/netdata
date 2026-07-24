@@ -95,7 +95,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             , HugePages_Rsvd = 0
             , HugePages_Surp = 0
             , Hugepagesize = 0
-            //, Hugetlb = 0
+            , Hugetlb = 0
             , DirectMap4k = 0
             , DirectMap2M = 0
             , DirectMap4M = 0
@@ -203,7 +203,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         arl_expect(arl_base, "HugePages_Rsvd", &HugePages_Rsvd);
         arl_expect(arl_base, "HugePages_Surp", &HugePages_Surp);
         arl_expect(arl_base, "Hugepagesize", &Hugepagesize);
-        //arl_expect(arl_base, "Hugetlb", &Hugetlb);
+        arl_expect(arl_base, "Hugetlb", &Hugetlb);
 
         arl_directmap4k = arl_expect(arl_base, "DirectMap4k", &DirectMap4k);
         arl_directmap2m = arl_expect(arl_base, "DirectMap2M", &DirectMap2M);
@@ -247,8 +247,16 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         MemAvailable += (zfs_arcstats_shrinkable_cache_size_bytes / 1024);
     }
 
+    // Hugetlb is the total memory consumed by pre-allocated hugepages of all sizes.
+    // The kernel removes it from MemFree without accounting it as cache/buffers, so it
+    // is included in MemUsed above. This memory is a separately-managed pool (e.g. RAM
+    // dedicated to KVM guests) and should not be reported as genuinely used memory, as
+    // that triggers false ram_in_use alerts. Move it to its own system.ram dimension.
+    unsigned long long Hugepages = (Hugetlb <= MemUsed) ? Hugetlb : MemUsed;
+    MemUsed -= Hugepages;
+
     if(do_ram) {
-        common_system_ram(MemFree * 1024, MemUsed * 1024, MemCached * 1024, Buffers * 1024, update_every);
+        common_system_ram(MemFree * 1024, MemUsed * 1024, MemCached * 1024, Buffers * 1024, Hugepages * 1024, update_every);
 
         if(arl_memavailable->flags & ARL_ENTRY_FLAG_FOUND)
             common_mem_available(MemAvailable * 1024, update_every);
