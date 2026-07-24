@@ -132,6 +132,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squid)                           |             Squid             |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squidlog)                     |             Squid             |
 | [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/smartctl)                     |   S.M.A.R.T Storage Devices   |
+| [smbios_memory](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/smbios_memory)           |    Physical Memory Modules    |
 | [spigotmc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/spigotmc)                     |           SpigotMC            |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/storcli)                       |    Broadcom Hardware RAID     |
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/supervisord)               |          Supervisor           |

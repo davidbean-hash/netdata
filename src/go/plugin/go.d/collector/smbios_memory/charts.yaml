@@ -1,0 +1,42 @@
+version: v1
+context_namespace: smbios_memory
+groups:
+  - family: memory
+    metrics:
+      - dimm_size
+      - dimm_speed
+      - dimm_ranks
+    charts:
+      - id: dimm_size
+        title: Memory module size
+        context: dimm_size
+        units: bytes
+        type: line
+        instances:
+          by_labels: [location]
+        label_promotion: [bank_locator, memory_type, form_factor, manufacturer, part_number]
+        dimensions:
+          - selector: dimm_size
+            name: size
+      - id: dimm_speed
+        title: Memory module speed
+        context: dimm_speed
+        units: MT/s
+        type: line
+        instances:
+          by_labels: [location]
+        label_promotion: [bank_locator, memory_type, form_factor, manufacturer, part_number]
+        dimensions:
+          - selector: dimm_speed
+            name: speed
+      - id: dimm_ranks
+        title: Memory module ranks
+        context: dimm_ranks
+        units: ranks
+        type: line
+        instances:
+          by_labels: [location]
+        label_promotion: [bank_locator, memory_type, form_factor, manufacturer, part_number]
+        dimensions:
+          - selector: dimm_ranks
+            name: ranks

@@ -1,0 +1,155 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-smbios_memory
+      plugin_name: go.d.plugin
+      module_name: smbios_memory
+      monitored_instance:
+        name: SMBIOS Memory (DIMM inventory)
+        link: https://www.dmtf.org/standards/smbios
+        icon_filename: microchip.svg
+        categories:
+          - data-collection.hardware-and-sensors
+      keywords:
+        - memory
+        - dimm
+        - ram
+        - smbios
+        - dmi
+        - hardware
+        - inventory
+        - ddr4
+        - ddr5
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector exposes per-DIMM physical memory inventory from the system's BIOS/UEFI.
+
+          It reads the raw SMBIOS structure table (`/sys/firmware/dmi/tables/DMI`, the same data `dmidecode -t 17` reads) and decodes the SMBIOS Memory Device (DMI type 17) records. Unlike EDAC, which only reports memory devices that participate in error detection, SMBIOS provides the authoritative slot-by-slot inventory including DDR generation, manufacturer, and part number.
+
+          For each populated memory slot it reports the module size, configured speed, and rank count, and attaches the slot locator, bank locator, memory type (e.g. DDR4/DDR5), form factor, manufacturer, and part number as labels. Empty slots are skipped.
+        method_description: |
+          The collector parses the SMBIOS entry structures directly from the kernel-exported DMI table; it does not execute `dmidecode`.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          The raw DMI table (`/sys/firmware/dmi/tables/DMI`) is typically readable only by root. The Netdata Agent must be able to read this file for the collector to work.
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector is disabled by default and must be explicitly enabled. Once enabled, it reads the configured DMI table path and starts if at least one Memory Device (type 17) record is present.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            Memory inventory is static hardware information, so a long collection interval (default 60 seconds) is sufficient and the exposed metrics do not churn.
+    setup:
+      prerequisites:
+        list:
+          - title: Enable the collector
+            description: |
+              This collector is opt-in. Enable it by setting `smbios_memory: yes` in the `modules` section of `go.d.conf`.
+          - title: Grant read access to the DMI table
+            description: |
+              Ensure the user running the Netdata Agent can read `/sys/firmware/dmi/tables/DMI`. This file is usually root-only, so read access must be granted explicitly.
+      configuration:
+        file:
+          name: go.d/smbios_memory.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 60
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval, in seconds. Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: path
+              description: Path to the raw SMBIOS structure table.
+              default_value: /sys/firmware/dmi/tables/DMI
+              required: true
+              group: Target
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Read per-DIMM inventory from the default DMI table path.
+              config: |
+                jobs:
+                  - name: smbios_memory
+                    path: /sys/firmware/dmi/tables/DMI
+    troubleshooting:
+      problems:
+        list:
+          - name: Permission denied reading the DMI table
+            description: |
+              The Netdata Agent user cannot read `/sys/firmware/dmi/tables/DMI`. Grant read access to that file or run the Agent with sufficient privileges.
+          - name: No memory devices found
+            description: |
+              Some virtualized environments do not expose SMBIOS Memory Device (type 17) records. In that case there is no per-DIMM inventory to collect.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: memory module
+          description: These metrics refer to a single physical memory module (DIMM).
+          labels:
+            - name: location
+              description: Device locator (physical slot), e.g. DIMM_A1.
+            - name: bank_locator
+              description: Bank locator reported by the BIOS.
+            - name: memory_type
+              description: Memory type, e.g. DDR4, DDR5.
+            - name: form_factor
+              description: Module form factor, e.g. DIMM, SODIMM.
+            - name: manufacturer
+              description: Module manufacturer.
+            - name: part_number
+              description: Module part number.
+          metrics:
+            - name: smbios_memory.dimm_size
+              description: Memory module size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: smbios_memory.dimm_speed
+              description: Memory module speed
+              unit: MT/s
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: smbios_memory.dimm_ranks
+              description: Memory module ranks
+              unit: ranks
+              chart_type: line
+              dimensions:
+                - name: ranks

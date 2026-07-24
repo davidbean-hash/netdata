@@ -1,0 +1,1 @@
+integrations/smbios_memory_dimm_inventory.md
