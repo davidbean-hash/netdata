@@ -49,6 +49,48 @@ template:
           name: d0
 `,
 		},
+		"valid with presentation meta block": {
+			yaml: `match: "a_*"
+app: my_app
+meta:
+  name: My App
+  link: https://example.com
+  icon_filename: my_app.svg
+  categories:
+    - data-collection.web-servers-and-proxies
+  keywords:
+    - my_app
+  description: Monitor My App.
+template:
+  family: fam
+  metrics:
+    - a_total
+  charts:
+    - title: Title
+      context: ctx
+      units: count
+      dimensions:
+        - selector: a_total
+          name: d0
+`,
+		},
+		"unknown top-level key rejected": {
+			yaml: `match: "a_*"
+bogus: value
+template:
+  family: fam
+  metrics:
+    - a_total
+  charts:
+    - title: Title
+      context: ctx
+      units: count
+      dimensions:
+        - selector: a_total
+          name: d0
+`,
+			wantErr: true,
+		},
 		"invalid app format": {
 			yaml: `match: "a_*"
 app: "Bad App!"

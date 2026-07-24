@@ -12,6 +12,27 @@ match: 'haproxy_*'
 # used when the job's `app` config is not set (by the user, or automatically by service
 # discovery). A configured `app` wins; the job name is the last resort.
 app: haproxy
+# meta: presentation-only metadata for the integrations catalog. It is the single
+# source of truth for this profile's generated integration page (name, link, icon,
+# categories, keywords, description). The Netdata runtime ignores it; the
+# integrations docs generator (integrations/gen_prometheus_profiles.py) reads it
+# together with the template below to emit a per-profile integration page.
+meta:
+  name: HAProxy (PromEx)
+  link: https://github.com/haproxy/haproxy/tree/master/addons/promex
+  icon_filename: haproxy.svg
+  categories:
+    - data-collection.web-servers-and-proxies
+  keywords:
+    - haproxy
+    - promex
+    - web
+    - proxy
+    - prometheus
+  description: |
+    Monitor HAProxy load balancer health and performance through the HAProxy PromEx
+    Prometheus exporter, with curated per-second charts for the process, frontends,
+    listeners, backends, servers, resolvers, and stick tables.
 template:
   family: HAProxy
   context_namespace: haproxy
