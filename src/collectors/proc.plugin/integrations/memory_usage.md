@@ -117,7 +117,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| system.ram | free, used, cached, buffers | MiB |
+| system.ram | free, used, cached, buffers, hugepages | MiB |
 | mem.available | avail | MiB |
 | mem.swap | free, used | MiB |
 | mem.swap_cached | cached | MiB |

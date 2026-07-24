@@ -1366,6 +1366,7 @@ modules:
                 - name: used
                 - name: cached
                 - name: buffers
+                - name: hugepages
             - name: mem.available
               description: Available RAM for applications
               unit: "MiB"
